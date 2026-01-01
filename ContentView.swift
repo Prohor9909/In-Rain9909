@@ -1,0 +1,1209 @@
+import SwiftUI
+import Combine
+import AVFoundation
+import MediaPlayer
+import AVKit
+import UIKit
+import StoreKit
+
+class PurchaseManager: ObservableObject {
+    static let shared = PurchaseManager()
+    
+    @Published var isPremium: Bool = false
+    @Published var products: [Product] = []
+    
+    private let productID = "com.studio.In.Rain.premium"
+    
+    private var updates: Task<Void, Never>? = nil
+    
+    init() {
+        updates = Task.detached { [weak self] in
+            for await result in StoreKit.Transaction.updates {
+                guard let self = self else { return }
+                if let transaction = try? self.checkVerified(result) {
+                    await self.process(transaction: transaction)
+                    await transaction.finish()
+                }
+            }
+        }
+        
+        Task {
+            await requestProducts()
+            await updatePurchasedStatus()
+        }
+    }
+    
+    deinit {
+        updates?.cancel()
+    }
+    
+    @MainActor
+    func requestProducts() async {
+        do {
+            products = try await Product.products(for: [productID])
+        } catch {
+            print("Failed to fetch products: \(error)")
+        }
+    }
+    
+    @MainActor
+    func updatePurchasedStatus() async {
+        for await result in StoreKit.Transaction.currentEntitlements {
+            if let transaction = try? checkVerified(result) {
+                if transaction.productID == productID {
+                    self.setPremiumStatus(true)
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    func purchasePremium() {
+        guard let product = products.first else { return }
+        
+        Task {
+            do {
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    let transaction = try checkVerified(verification)
+                    process(transaction: transaction)
+                    await transaction.finish()
+                case .userCancelled:
+                    break
+                case .pending:
+                    break
+                @unknown default:
+                    break
+                }
+            } catch {
+                print("Purchase failed: \(error)")
+            }
+        }
+    }
+    
+    @MainActor
+    func restorePurchases() {
+        Task {
+            try? await AppStore.sync()
+            await updatePurchasedStatus()
+        }
+    }
+    
+    @MainActor
+    private func process(transaction: StoreKit.Transaction) {
+        if transaction.productID == productID {
+            setPremiumStatus(true)
+        }
+    }
+    
+    private func setPremiumStatus(_ status: Bool) {
+        DispatchQueue.main.async {
+            self.isPremium = status
+        }
+    }
+    
+    nonisolated private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+        switch result {
+        case .unverified:
+            throw URLError(.badServerResponse)
+        case .verified(let safe):
+            return safe
+        }
+    }
+}
+
+struct RainParticle: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var speed: Double
+    var opacity: Double
+    var scale: Double
+    var length: CGFloat
+}
+
+struct RainEffectView: View {
+    var intensity: Double
+    @State private var particles = [RainParticle]()
+    
+    private var targetParticleCount: Int {
+        return intensity > 0 ? Int(50 + (150 * intensity)) : 0
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                Canvas { context, size in
+                    for particle in particles {
+                        var particleContext = context
+                        particleContext.opacity = particle.opacity
+                        let frame = CGRect(x: particle.x, y: particle.y, width: 2 * particle.scale, height: particle.length)
+                        let shape = Capsule().path(in: frame)
+                        particleContext.fill(shape, with: .color(.white.opacity(0.7)))
+                    }
+                }
+                .rotationEffect(.degrees(10))
+                .opacity(intensity > 0 ? 1.0 : 0.0)
+                .animation(.linear(duration: 0.3), value: intensity > 0)
+                .onChange(of: time) {
+                    let baseSpeed: Double = 2.25
+                    let volumeSpeedMultiplier = 1.0 + (intensity * 0.3)
+                    for i in particles.indices {
+                        particles[i].y += particles[i].speed * (0.016 * 60) * baseSpeed * volumeSpeedMultiplier * 0.3
+                        if particles[i].y > geometry.size.height + 100 {
+                            particles[i] = createParticle(in: geometry.size, isInitial: false)
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                particles = (0..<targetParticleCount).map { _ in
+                    createParticle(in: geometry.size, isInitial: true)
+                }
+            }
+            .onChange(of: intensity) {
+                let diff = targetParticleCount - particles.count
+                if diff > 0 {
+                    particles.append(contentsOf: (0..<diff).map { _ in createParticle(in: geometry.size, isInitial: false) })
+                } else if diff < 0 {
+                    particles.removeLast(abs(diff))
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+    
+    private func createParticle(in size: CGSize, isInitial: Bool) -> RainParticle {
+        let scale = Double.random(in: 0.5...1.0)
+        return RainParticle(
+            x: .random(in: -50...size.width + 50),
+            y: .random(in: isInitial ? -100...size.height : -150...(-50)),
+            speed: .random(in: 15...25) * scale,
+            opacity: .random(in: 0.1...0.5),
+            scale: scale,
+            length: .random(in: 20...50) * scale
+        )
+    }
+}
+
+struct FireParticle: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var speed: Double
+    var opacity: Double
+    var scale: Double
+    var color: Color
+    var drift: Double
+    var shapeSeed: Double
+}
+
+struct FireGlowView: View {
+    let intensity: Double
+    @State private var isAnimating1 = false
+    @State private var isAnimating2 = false
+    
+    private var glowScale: CGFloat {
+        0.5 + (intensity * 0.5)
+    }
+    
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .fill(Color.orange.opacity(0.6))
+                .frame(width: 300 * glowScale, height: 100 * glowScale)
+                .blur(radius: 60)
+                .scaleEffect(isAnimating1 ? 1.05 : 0.95, anchor: .bottom)
+                .opacity(isAnimating1 ? 0.7 : 0.5)
+            
+            Ellipse()
+                .fill(Color.yellow.opacity(0.5))
+                .frame(width: 200 * glowScale, height: 80 * glowScale)
+                .blur(radius: 50)
+                .scaleEffect(isAnimating2 ? 0.95 : 1.05, anchor: .bottom)
+                .opacity(isAnimating2 ? 0.6 : 0.4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .opacity(intensity > 0 ? 1.0 : 0.0)
+        .animation(.linear(duration: 0.5), value: intensity)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.1).repeatForever(autoreverses: true)) {
+                isAnimating1 = true
+            }
+            withAnimation(.easeInOut(duration: 1.7).repeatForever( autoreverses: true)) {
+                isAnimating2 = true
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct FireEffectView: View {
+    var intensity: Double
+    @State private var particles = [FireParticle]()
+    private var targetParticleCount: Int { Int(10 + (60 * intensity)) }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                FireGlowView(intensity: intensity)
+                TimelineView(.animation(minimumInterval: 0.016)) { timeline in
+                    let time = timeline.date.timeIntervalSinceReferenceDate
+                    Canvas { context, size in
+                        for particle in particles {
+                            var particleContext = context
+                            particleContext.opacity = particle.opacity
+                            let frame = CGRect(x: particle.x, y: particle.y, width: 8 * particle.scale, height: 8 * particle.scale)
+                            let shape = createEmberShape(in: frame, seed: particle.shapeSeed, time: time)
+                            particleContext.addFilter(.shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1))
+                            particleContext.fill(shape, with: .color(particle.color))
+                        }
+                    }
+                    .opacity(intensity > 0 ? 1.0 : 0.0)
+                    .animation(.linear(duration: 0.3), value: intensity > 0)
+                    .onChange(of: time) {
+                        let volumeSpeedMultiplier = 1.0 + (intensity * 0.5)
+                        for i in particles.indices {
+                            particles[i].y -= particles[i].speed * (0.016 * 60) * volumeSpeedMultiplier
+                            particles[i].x += sin(time * particles[i].drift) * 0.5
+                            particles[i].opacity -= 0.008
+                            if particles[i].y < geometry.size.height - 250 || particles[i].opacity <= 0 {
+                                particles[i] = createParticle(in: geometry.size)
+                            }
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                particles = (0..<targetParticleCount).map { _ in
+                    createParticle(in: geometry.size)
+                }
+            }
+            .onChange(of: intensity) {
+                let diff = targetParticleCount - particles.count
+                if diff > 0 {
+                    particles.append(contentsOf: (0..<diff).map { _ in createParticle(in: geometry.size) })
+                } else if diff < 0 {
+                    particles.removeLast(abs(diff))
+                }
+            }
+        }
+    }
+    
+    private func createEmberShape(in rect: CGRect, seed: Double, time: TimeInterval) -> Path {
+        var path = Path()
+        let wobble = sin(time * 3 + seed) * (rect.width / 3)
+        let wobble2 = cos(time * 2 + seed) * (rect.width / 3)
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.midY), control: CGPoint(x: rect.maxX + wobble, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.maxY), control: CGPoint(x: rect.maxX, y: rect.maxY + wobble2))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.midY), control: CGPoint(x: rect.minX - wobble, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.minY), control: CGPoint(x: rect.minX, y: rect.minY - wobble2))
+        return path
+    }
+    
+    private func createParticle(in size: CGSize) -> FireParticle {
+        let scale = Double.random(in: 0.4...1.0)
+        return FireParticle(
+            x: .random(in: 0...size.width),
+            y: .random(in: size.height...size.height + 40),
+            speed: .random(in: 0.3...1.0),
+            opacity: .random(in: 0.6...0.9),
+            scale: scale,
+            color: [.orange, .yellow, .red].randomElement()!,
+            drift: .random(in: 1...3),
+            shapeSeed: .random(in: 0...100)
+        )
+    }
+}
+
+class AudioEngineManager: ObservableObject {
+    private var players: [AVAudioPlayer?] = []
+    private let fileNames = ["rain", "fireplace", "umbrella", "Blizzard", "ocean"]
+    private var individualVolumes: [Float] = []
+    
+    private var wasPlayingWhenBackgrounded = false
+    private var randomizerTimer: Timer?
+    private var isPanLeft = true
+    
+    private var usageTimer: Timer?
+    @Published var continuousPlayTime: TimeInterval = 0
+    @Published var showPremiumUpsell = false
+    
+    @Published var isBackgroundAudioEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isBackgroundAudioEnabled, forKey: "isBackgroundAudioEnabled")
+            configureAudioSession()
+        }
+    }
+    
+    @Published var isMixerModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isMixerModeEnabled, forKey: "isMixerModeEnabled")
+            configureAudioSession()
+        }
+    }
+    
+    @Published var isRandomVolumeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isRandomVolumeEnabled, forKey: "isRandomVolumeEnabled")
+            updateRandomizerState()
+        }
+    }
+    
+    @Published var isRandomOscillationEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isRandomOscillationEnabled, forKey: "isRandomOscillationEnabled")
+            updateRandomizerState()
+        }
+    }
+    
+    @Published var isParticleEffectsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isParticleEffectsEnabled, forKey: "isParticleEffectsEnabled")
+        }
+    }
+    
+    @Published var isPlaying: Bool = false {
+        didSet {
+            updateNowPlayingInfo()
+            if isPlaying {
+                startUsageTracking()
+            } else {
+                stopUsageTracking()
+            }
+        }
+    }
+    
+    @Published var masterVolume: Float = 1.0 {
+        didSet {
+            updateAllVolumes()
+        }
+    }
+    
+    init() {
+        self.isBackgroundAudioEnabled = UserDefaults.standard.object(forKey: "isBackgroundAudioEnabled") as? Bool ?? true
+        self.isMixerModeEnabled = UserDefaults.standard.object(forKey: "isMixerModeEnabled") as? Bool ?? false
+        self.isRandomVolumeEnabled = UserDefaults.standard.bool(forKey: "isRandomVolumeEnabled")
+        self.isRandomOscillationEnabled = UserDefaults.standard.bool(forKey: "isRandomOscillationEnabled")
+        self.isParticleEffectsEnabled = UserDefaults.standard.bool(forKey: "isParticleEffectsEnabled")
+        
+        individualVolumes = Array(repeating: 0.5, count: fileNames.count)
+        
+        configureAudioSession()
+        setupPlayers()
+        setupInterruptionObserver()
+        setupRemoteTransportControls()
+        setupLifecycleObservers()
+        updateRandomizerState()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        randomizerTimer?.invalidate()
+        usageTimer?.invalidate()
+    }
+    
+    private func setupLifecycleObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+    
+    @objc private func appDidEnterBackground() {
+        if !isBackgroundAudioEnabled {
+            if isPlaying {
+                wasPlayingWhenBackgrounded = true
+                stop()
+            } else {
+                wasPlayingWhenBackgrounded = false
+            }
+        }
+    }
+    
+    @objc private func appWillEnterForeground() {
+        if !isBackgroundAudioEnabled && wasPlayingWhenBackgrounded {
+            play()
+            wasPlayingWhenBackgrounded = false
+        }
+    }
+    
+    private func configureAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            var options: AVAudioSession.CategoryOptions = [.allowAirPlay]
+            if isBackgroundAudioEnabled && isMixerModeEnabled {
+                options.insert(.mixWithOthers)
+            }
+            try session.setCategory(.playback, mode: .default, options: options)
+            try session.setActive(true)
+        } catch {
+            print("ERROR: Failed to configure audio session: \(error)")
+        }
+    }
+    
+    private func setupInterruptionObserver() {
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(handleInterruption),
+                                               name: AVAudioSession.interruptionNotification,
+                                               object: AVAudioSession.sharedInstance())
+    }
+    
+    private func setupRemoteTransportControls() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            self?.play()
+            return .success
+        }
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.stop()
+            return .success
+        }
+        commandCenter.nextTrackCommand.isEnabled = false
+        commandCenter.previousTrackCommand.isEnabled = false
+    }
+    
+    private func updateNowPlayingInfo() {
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = "White Noise"
+        if isPlaying {
+            nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = 1.0
+        } else {
+            nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+    }
+    
+    @objc private func handleInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        if type == .began {
+            DispatchQueue.main.async { self.isPlaying = false }
+        } else if type == .ended {
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    self.play()
+                }
+            }
+        }
+    }
+    
+    private func setupPlayers() {
+        players.removeAll()
+        for (index, fileName) in fileNames.enumerated() {
+            guard let url = Bundle.main.url(forResource: fileName, withExtension: "mp3") else {
+                players.append(nil)
+                continue
+            }
+            do {
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.numberOfLoops = -1
+                let vol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
+                player.volume = vol * masterVolume
+                player.prepareToPlay()
+                players.append(player)
+            } catch {
+                players.append(nil)
+            }
+        }
+    }
+    
+    private func updateRandomizerState() {
+        randomizerTimer?.invalidate()
+        randomizerTimer = nil
+        if isRandomVolumeEnabled || isRandomOscillationEnabled {
+            randomizerTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+                self?.handleRandomizerTick()
+            }
+        } else {
+            resetRandomizerEffects()
+        }
+    }
+    
+    private func handleRandomizerTick() {
+        guard isPlaying else { return }
+        isPanLeft.toggle()
+        for (index, player) in players.enumerated() {
+            guard let player = player else { continue }
+            let baseVol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
+            let calculatedBaseVolume = baseVol * masterVolume
+            
+            if isRandomVolumeEnabled {
+                let randomMultiplier = Float.random(in: 0.2...1.8)
+                let randomVolume = max(0.0, min(1.0, calculatedBaseVolume * randomMultiplier))
+                player.setVolume(randomVolume, fadeDuration: 0.5)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    if self.isRandomVolumeEnabled && self.isPlaying {
+                        player.setVolume(calculatedBaseVolume, fadeDuration: 2.0)
+                    }
+                }
+            } else {
+                if abs(player.volume - calculatedBaseVolume) > 0.01 {
+                    player.setVolume(calculatedBaseVolume, fadeDuration: 1.0)
+                }
+            }
+            
+            if isRandomOscillationEnabled {
+                let targetPan: Float = isPanLeft ? -0.8 : 0.8
+                smoothPan(player: player, to: targetPan, duration: 2.0)
+            } else {
+                if player.pan != 0.0 { player.pan = 0.0 }
+            }
+        }
+    }
+    
+    private func smoothPan(player: AVAudioPlayer, to target: Float, duration: TimeInterval) {
+        let steps = 30
+        let interval = duration / Double(steps)
+        let startPan = player.pan
+        let delta = (target - startPan) / Float(steps)
+        for i in 1...steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (interval * Double(i))) {
+                if self.isRandomOscillationEnabled && self.isPlaying {
+                    player.pan = startPan + (delta * Float(i))
+                }
+            }
+        }
+    }
+    
+    private func resetRandomizerEffects() {
+        for (index, player) in players.enumerated() {
+            guard let player = player else { continue }
+            let baseVol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
+            player.setVolume(baseVol * masterVolume, fadeDuration: 1.0)
+            player.pan = 0.0
+        }
+    }
+    
+    private func startUsageTracking() {
+        stopUsageTracking()
+        guard !PurchaseManager.shared.isPremium else { return }
+        
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if PurchaseManager.shared.isPremium {
+                self.stopUsageTracking()
+                return
+            }
+            
+            self.continuousPlayTime += 1
+            
+            if self.continuousPlayTime >= 60 {
+                self.triggerUpsell()
+            }
+        }
+        
+        RunLoop.main.add(timer, forMode: .common)
+        self.usageTimer = timer
+    }
+    
+    private func stopUsageTracking() {
+        usageTimer?.invalidate()
+        usageTimer = nil
+    }
+    
+    private func triggerUpsell() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.stop()
+            self.continuousPlayTime = 0
+            self.showPremiumUpsell = true
+        }
+    }
+    
+    func resetUsageCounter() {
+        continuousPlayTime = 0
+    }
+    
+    func setVolume(for index: Int, volume: Float) {
+        guard index < individualVolumes.count else { return }
+        individualVolumes[index] = volume
+        if index < players.count, let player = players[index] {
+            player.volume = individualVolumes[index] * masterVolume
+        }
+    }
+    
+    private func updateAllVolumes() {
+        for (index, player) in players.enumerated() {
+            guard let player = player else { continue }
+            player.volume = individualVolumes[index] * masterVolume
+        }
+    }
+    
+    func togglePlay() {
+        if isPlaying { stop() } else { play() }
+    }
+    
+    func play() {
+        configureAudioSession()
+        for player in players { player?.play() }
+        isPlaying = true
+    }
+    
+    func stop() {
+        for player in players { player?.pause() }
+        isPlaying = false
+    }
+}
+
+class TimerManager: ObservableObject {
+    @Published var timeRemaining: TimeInterval = 0
+    @Published var totalDuration: TimeInterval = 0
+    @Published var isTimerActive = false
+    private var timer: Timer?
+    private var audioManager: AudioEngineManager?
+    
+    func setAudioManager(_ manager: AudioEngineManager) {
+        self.audioManager = manager
+    }
+    
+    func startTimer(duration: TimeInterval) {
+        stopTimer()
+        totalDuration = duration
+        timeRemaining = duration
+        isTimerActive = true
+        audioManager?.play()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if self.timeRemaining > 0 {
+                self.timeRemaining -= 1
+            } else {
+                self.timerFinished()
+            }
+        }
+    }
+    
+    func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+        isTimerActive = false
+        timeRemaining = 0
+        totalDuration = 0
+    }
+    
+    private func timerFinished() {
+        stopTimer()
+        audioManager?.stop()
+    }
+    
+    var progress: Double {
+        guard totalDuration > 0 else { return 0 }
+        return timeRemaining / totalDuration
+    }
+    
+    var formattedTime: String {
+        let hours = Int(timeRemaining) / 3600
+        let minutes = (Int(timeRemaining) % 3600) / 60
+        let seconds = Int(timeRemaining) % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+}
+
+struct BulbSliderWithToggle: View {
+    @Binding var value: Double
+    @Binding var isOn: Bool
+    var activeIcon: String
+    var activeColors: [Color]
+    var iconColorOverride: Color? = nil
+    var onUpdate: () -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+            let knobDiameter: CGFloat = width - 4
+            let bottomPadding: CGFloat = 2
+            let trackWidth: CGFloat = 12
+            let trackHeight = height - knobDiameter - (bottomPadding * 2)
+            
+            ZStack(alignment: .bottom) {
+                Capsule()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: trackWidth)
+                
+                if isOn {
+                    Capsule()
+                        .fill(LinearGradient(colors: activeColors, startPoint: .bottom, endPoint: .top))
+                        .frame(width: trackWidth, height: (CGFloat(value) * trackHeight) + knobDiameter + (bottomPadding * 2))
+                        .shadow(color: activeColors.first?.opacity(0.5) ?? .clear, radius: 10)
+                        .animation(.spring(response: 0.3), value: value)
+                }
+                
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.3), radius: 3, x: 0, y: 2)
+                    Image(systemName: activeIcon)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(isOn ? (iconColorOverride ?? activeColors.last) : .gray)
+                }
+                .frame(width: knobDiameter, height: knobDiameter)
+                .offset(y: -(CGFloat(value) * trackHeight)-2)
+                .padding(.bottom, bottomPadding)
+            }
+            .frame(width: width, height: height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let dragY = gesture.location.y
+                        let rawValue = 1.0 - (dragY / height)
+                        let clamped = min(max(rawValue, 0.0), 1.0)
+                        let threshold: Double = 0.05
+                        
+                        if clamped > threshold && !isOn {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            isOn = true
+                        } else if clamped <= threshold && isOn {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            isOn = false
+                        }
+                        
+                        if !isOn { value = 0.0 } else { value = clamped }
+                        onUpdate()
+                    }
+            )
+        }
+        .frame(width: 44, height: 180)
+    }
+}
+
+struct FullScreenTimerView: View {
+    @ObservedObject var timerManager: TimerManager
+    @Environment(\.dismiss) var dismiss
+    @State private var showCancelConfirmation = false
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack {
+                Spacer()
+                ZStack {
+                    Circle().stroke(Color.gray.opacity(0.3), lineWidth: 15)
+                    Circle().trim(from: 0, to: CGFloat(timerManager.progress))
+                        .stroke(Color.orange, style: StrokeStyle(lineWidth: 15, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1.0), value: timerManager.progress)
+                    Text(timerManager.formattedTime)
+                        .font(.system(size: 64, weight: .thin, design: .default))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                }
+                .frame(width: 300, height: 300)
+                .padding()
+                Spacer()
+                Button(action: { showCancelConfirmation = true }) {
+                    Text("Cancel").font(.title2).fontWeight(.medium).foregroundColor(.black)
+                        .frame(width: 80, height: 80).background(Color.gray).clipShape(Circle())
+                        .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                }
+                .padding(.bottom, 50)
+            }
+        }
+        .alert(isPresented: $showCancelConfirmation) {
+            Alert(
+                title: Text("Cancel Timer"),
+                message: Text("Are you sure you want to cancel the timer?"),
+                primaryButton: .destructive(Text("Cancel Timer")) {
+                    timerManager.stopTimer()
+                    dismiss()
+                },
+                secondaryButton: .cancel()
+            )
+        }
+    }
+}
+
+struct PremiumUpsellView: View {
+    @ObservedObject var audioManager: AudioEngineManager
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject private var purchaseManager = PurchaseManager.shared
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            RadialGradient(gradient: Gradient(colors: [Color.purple.opacity(0.2), Color.black]), center: .center, startRadius: 5, endRadius: 400).ignoresSafeArea()
+            
+            VStack(spacing: 30) {
+                Spacer()
+                ZStack {
+                    Circle().fill(Color.orange.opacity(0.1)).frame(width: 150, height: 150)
+                    Image(systemName: "crown.fill").font(.system(size: 70)).foregroundColor(.orange).shadow(color: .orange.opacity(0.5), radius: 10, x: 0, y: 0)
+                }
+                .padding(.bottom, 20)
+                
+                Text("Upgrade to Premium").font(.system(size: 32, weight: .bold)).foregroundColor(.white)
+                Text("Enjoy uninterrupted relaxation.").font(.title3).foregroundColor(.white.opacity(0.7)).multilineTextAlignment(.center).padding(.horizontal)
+                
+                Spacer()
+                
+                VStack(spacing: 16) {
+                    Button(action: {
+                        purchaseManager.purchasePremium()
+                    }) {
+                        HStack {
+                            Text("Purchase Full Version").fontWeight(.bold)
+                            Spacer()
+                            Text(purchaseManager.products.first?.displayPrice ?? "$0.99")
+                        }
+                        .foregroundColor(.white).padding().frame(height: 56)
+                        .background(LinearGradient(colors: [Color.orange, Color.red], startPoint: .leading, endPoint: .trailing))
+                        .cornerRadius(12)
+                    }
+                    
+                    Button(action: {
+                        dismiss()
+                        audioManager.play()
+                    }) {
+                        Text("Keep using free version").font(.subheadline).foregroundColor(.white.opacity(0.6)).padding()
+                    }
+                    
+                    Button("Restore Purchases") {
+                        purchaseManager.restorePurchases()
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 30).padding(.bottom, 50)
+            }
+        }
+        .transition(.opacity)
+        .onChange(of: purchaseManager.isPremium) { _, newValue in
+            if newValue {
+                dismiss()
+                audioManager.play()
+            }
+        }
+    }
+}
+
+struct CustomTimerSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var timerManager: TimerManager
+    var audioManager: AudioEngineManager
+    
+    @State private var selectedHours = 0
+    @State private var selectedMinutes = 5
+    @State private var selectedSeconds = 0
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+                VStack(spacing: 30) {
+                    Text("Set Duration").font(.title3).foregroundColor(.white.opacity(0.7)).padding(.top, 20)
+                    HStack(spacing: 0) {
+                        Picker("Hours", selection: $selectedHours) { ForEach(0..<24) { i in Text("\(i) h").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
+                        Picker("Minutes", selection: $selectedMinutes) { ForEach(0..<60) { i in Text("\(i) m").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
+                        Picker("Seconds", selection: $selectedSeconds) { ForEach(0..<60) { i in Text("\(i) s").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
+                    }
+                    .colorScheme(.dark).padding()
+                    Spacer()
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.foregroundColor(.white) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Start") {
+                        let totalSeconds = TimeInterval((selectedHours * 3600) + (selectedMinutes * 60) + selectedSeconds)
+                        if totalSeconds > 0 { timerManager.startTimer(duration: totalSeconds) }
+                        dismiss()
+                    }.font(.headline).foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+struct SettingsView: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var audioManager: AudioEngineManager
+    @State private var showUpsell = false
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+                List {
+                    Section {
+                        if PurchaseManager.shared.isPremium {
+                            HStack { Image(systemName: "checkmark.seal.fill").foregroundColor(.orange); Text("Premium Unlocked").foregroundColor(.orange) }
+                        } else {
+                            Button(action: { showUpsell = true }) {
+                                HStack { Image(systemName: "crown.fill").foregroundColor(.orange); Text("Unlock Premium").foregroundColor(.white) }
+                            }
+                        }
+                    }
+                    .listRowBackground(Color.white.opacity(0.1))
+                    
+                    NavigationLink(destination: BackgroundAudioSettingsView(audioManager: audioManager)) {
+                        HStack { Image(systemName: "speaker.wave.2.fill").foregroundColor(.white).frame(width: 24); Text("Background Audio").foregroundColor(.white) }
+                    }
+                    .listRowBackground(Color.white.opacity(0.1))
+                    
+                    NavigationLink(destination: RandomizerSettingsView(audioManager: audioManager)) {
+                        HStack { Image(systemName: "shuffle").foregroundColor(.white).frame(width: 24); Text("Randomizer").foregroundColor(.white) }
+                    }
+                    .listRowBackground(Color.white.opacity(0.1))
+                    
+                    NavigationLink(destination: ParticleSettingsView(audioManager: audioManager)) {
+                        HStack { Image(systemName: "sparkles").foregroundColor(.white).frame(width: 24); Text("Particle Effects").foregroundColor(.white) }
+                    }
+                    .listRowBackground(Color.white.opacity(0.1))
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.font(.headline).foregroundColor(.blue) }
+            }
+            .fullScreenCover(isPresented: $showUpsell) {
+                PremiumUpsellView(audioManager: audioManager)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct BackgroundAudioSettingsView: View {
+    @ObservedObject var audioManager: AudioEngineManager
+    var body: some View {
+        ZStack {
+            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+            List {
+                Section {
+                    Toggle("Background Audio", isOn: $audioManager.isBackgroundAudioEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                } header: { Text("Audio Options").foregroundColor(.gray) } footer: {
+                    Text("If enabled, audio will continue playing when you exit the app or lock your screen. If disabled, audio will stop when the app is in the background.").foregroundColor(.gray)
+                }
+                .listRowBackground(Color.white.opacity(0.1))
+                
+                if audioManager.isBackgroundAudioEnabled {
+                    Section {
+                        Toggle("Mixer Mode", isOn: $audioManager.isMixerModeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                    } footer: { Text("If enabled, audio will play simultaneously with other apps.").foregroundColor(.gray) }
+                        .listRowBackground(Color.white.opacity(0.1))
+                }
+            }.scrollContentBackground(.hidden)
+        }.navigationTitle("Background & Mixer")
+    }
+}
+
+struct RandomizerSettingsView: View {
+    @ObservedObject var audioManager: AudioEngineManager
+    var body: some View {
+        ZStack {
+            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+            List {
+                Section {
+                    Toggle("Random Volume", isOn: $audioManager.isRandomVolumeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                } header: { Text("Volume Options").foregroundColor(.gray) } footer: {
+                    Text("If enabled, randomly, every 5 seconds, there will be a noticeable volume increase or decrease to create a dynamic experience.").foregroundColor(.gray)
+                }
+                .listRowBackground(Color.white.opacity(0.1))
+                Section {
+                    Toggle("Random Oscillation", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                } header: { Text("Pan Options").foregroundColor(.gray) } footer: {
+                    Text("If enabled, every 5 seconds the audio will alternate between the left and right speakers.").foregroundColor(.gray)
+                }
+                .listRowBackground(Color.white.opacity(0.1))
+            }.scrollContentBackground(.hidden)
+        }.navigationTitle("Randomizer")
+    }
+}
+
+struct ParticleSettingsView: View {
+    @ObservedObject var audioManager: AudioEngineManager
+    var body: some View {
+        ZStack {
+            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+            List {
+                Section {
+                    Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                } header: { Text("Visual Options").foregroundColor(.gray) } footer: {
+                    Text("If enabled, visual particle effects like rain and fire will be displayed on the main screen corresponding to active sounds.").foregroundColor(.gray)
+                }
+                .listRowBackground(Color.white.opacity(0.1))
+            }.scrollContentBackground(.hidden)
+        }.navigationTitle("Particle Effects")
+    }
+}
+
+struct AirPlayButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.backgroundColor = .clear
+        picker.activeTintColor = .orange
+        picker.tintColor = .white.withAlphaComponent(0.7)
+        return picker
+    }
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+
+struct ContentView: View {
+    @StateObject private var audioManager = AudioEngineManager()
+    @StateObject private var timerManager = TimerManager()
+    @State private var showCustomTimerSheet = false
+    @State private var showTimerDetail = false
+    @State private var showStopConfirmation = false
+    @State private var showSettings = false
+    
+    @State private var bulbValues: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
+    @State private var bulbToggles: [Bool] = [false, false, false, false, false]
+    
+    let sliderIcons = ["cloud.rain.fill", "flame.fill", "umbrella.fill", "wind.snow", "water.waves"]
+    let sliderColors: [[Color]] = [
+        [Color(red: 0.4, green: 0.8, blue: 1.0), Color(red: 0.0, green: 0.2, blue: 0.8)],
+        [Color.orange, Color.red],
+        [Color.yellow, Color.teal],
+        [Color.cyan, Color.mint],
+        [Color(red: 0.0, green: 0.5, blue: 0.5), Color(red: 0.0, green: 0.0, blue: 0.3)]
+    ]
+    
+    var isAnyBulbOn: Bool { bulbToggles.contains(true) }
+    
+    let bgGradient = LinearGradient(
+        gradient: Gradient(colors: [Color(red: 0.1, green: 0.1, blue: 0.2), Color(red: 0.05, green: 0.05, blue: 0.1)]),
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    
+    var body: some View {
+        ZStack {
+            bgGradient.ignoresSafeArea()
+            
+            RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(0) && bulbToggles[0]) ? bulbValues[0] : 0.0)
+                .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+            
+            FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(1) && bulbToggles[1]) ? bulbValues[1] : 0.0)
+                .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+            
+            VStack(spacing: 30) {
+                Button(action: { showTimerDetail = true }) {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
+                            Circle().trim(from: 0, to: CGFloat(timerManager.progress)).stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 14, height: 14)
+                        }.frame(width: 14, height: 14)
+                        Text(timerManager.formattedTime).font(.system(size: 14, weight: .medium)).monospacedDigit()
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6).background(Color.white.opacity(0.15)).clipShape(Capsule()).foregroundColor(.white)
+                }
+                .padding(.top, 40).opacity(timerManager.isTimerActive ? 1.0 : 0.0).disabled(!timerManager.isTimerActive).animation(.easeInOut, value: timerManager.isTimerActive)
+                
+                Spacer(minLength: 10)
+                
+                HStack(spacing: 16) {
+                    ForEach(0..<5, id: \.self) { idx in
+                        BulbSliderWithToggle(
+                            value: $bulbValues[idx], isOn: $bulbToggles[idx],
+                            activeIcon: sliderIcons[idx], activeColors: sliderColors[idx],
+                            iconColorOverride: (idx == 3 || idx == 4) ? sliderColors[idx].first : nil,
+                            onUpdate: { updateVolume(for: idx) }
+                        )
+                        .onChange(of: bulbValues[idx]) { _, _ in updateVolume(for: idx) }
+                        .onChange(of: bulbToggles[idx]) { _, isOn in
+                            updateVolume(for: idx)
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+                
+                Spacer(minLength: 12)
+                
+                Button(action: {
+                    if timerManager.isTimerActive { timerManager.stopTimer() }
+                    audioManager.togglePlay()
+                    let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
+                }) {
+                    ZStack {
+                        Circle().fill(LinearGradient(
+                            colors: (audioManager.isPlaying && isAnyBulbOn) ? [Color.blue.opacity(0.6), Color.purple.opacity(0.6)] : [Color.gray.opacity(0.3), Color.gray.opacity(0.1)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 120, height: 120)
+                        .shadow(color: (audioManager.isPlaying && isAnyBulbOn) ? .blue.opacity(0.5) : .clear, radius: 20, x: 0, y: 0)
+                        .opacity(isAnyBulbOn ? 1.0 : 0.3).grayscale(isAnyBulbOn ? 0.0 : 1.0)
+                        
+                        Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 40)).foregroundColor(.white.opacity(isAnyBulbOn ? 1.0 : 0.5))
+                    }
+                }
+                .disabled(!isAnyBulbOn)
+                .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: audioManager.isPlaying)
+                .animation(.easeInOut, value: isAnyBulbOn)
+                
+                Spacer(minLength: 20)
+                
+                HStack(alignment: .center, spacing: 40) {
+                    AirPlayButton()
+                        .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                        if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
+                    }) {
+                        Image(systemName: "timer").font(.system(size: 26)).foregroundColor(timerManager.isTimerActive ? .orange : .white)
+                            .frame(width: 64, height: 64).background(Color.white.opacity(0.1)).clipShape(Circle())
+                            .overlay(Circle().stroke(timerManager.isTimerActive ? Color.orange : Color.white.opacity(0.3), lineWidth: timerManager.isTimerActive ? 2 : 1))
+                    }
+                    
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundColor(.white.opacity(0.7))
+                            .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    }
+                }
+                .padding(.bottom, 40).frame(maxWidth: .infinity).animation(.spring(), value: timerManager.isTimerActive)
+            }
+        }
+        .onAppear {
+            timerManager.setAudioManager(audioManager)
+            for idx in 0..<bulbValues.count { updateVolume(for: idx) }
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showCustomTimerSheet) { CustomTimerSheet(timerManager: timerManager, audioManager: audioManager) }
+        .sheet(isPresented: $showTimerDetail) { FullScreenTimerView(timerManager: timerManager) }
+        .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
+        .alert(isPresented: $showStopConfirmation) {
+            Alert(
+                title: Text("Cancel Timer"), message: Text("Are you sure you want to cancel the timer?"),
+                primaryButton: .destructive(Text("Cancel Timer")) { timerManager.stopTimer() }, secondaryButton: .cancel()
+            )
+        }
+        .onChange(of: isAnyBulbOn) { _, newValue in
+            if !newValue && audioManager.isPlaying { audioManager.stop() }
+        }
+        .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
+            PremiumUpsellView(audioManager: audioManager)
+        }
+    }
+    
+    private func updateVolume(for index: Int) {
+        let targetVolume: Float = bulbToggles[index] ? Float(bulbValues[index]) : 0.0
+        audioManager.setVolume(for: index, volume: targetVolume)
+    }
+}
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView().preferredColorScheme(.dark)
+    }
+}
