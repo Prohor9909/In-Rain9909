@@ -6,6 +6,8 @@ import AVKit
 import UIKit
 import StoreKit
 
+//Testing Github push
+
 class PurchaseManager: ObservableObject {
     static let shared = PurchaseManager()
     
