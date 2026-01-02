@@ -11,7 +11,13 @@ import StoreKit
 class PurchaseManager: ObservableObject {
     static let shared = PurchaseManager()
     
-    @Published var isPremium: Bool = false
+    // Updated: Initialize from UserDefaults to persist state across app launches
+    @Published var isPremium: Bool = UserDefaults.standard.bool(forKey: "isPremium") {
+        didSet {
+            UserDefaults.standard.set(isPremium, forKey: "isPremium")
+        }
+    }
+    
     @Published var products: [Product] = []
     
     private let productID = "com.studio.In.Rain.premium"
@@ -50,13 +56,17 @@ class PurchaseManager: ObservableObject {
     
     @MainActor
     func updatePurchasedStatus() async {
+        var hasPremium = false
+        // Check all current entitlements
         for await result in StoreKit.Transaction.currentEntitlements {
             if let transaction = try? checkVerified(result) {
                 if transaction.productID == productID {
-                    self.setPremiumStatus(true)
+                    hasPremium = true
                 }
             }
         }
+        // Update status (sets to true if found, false if not found/refunded)
+        self.setPremiumStatus(hasPremium)
     }
     
     @MainActor
@@ -85,17 +95,20 @@ class PurchaseManager: ObservableObject {
     }
     
     @MainActor
-    func restorePurchases() {
-        Task {
-            try? await AppStore.sync()
-            await updatePurchasedStatus()
-        }
+    func restorePurchases() async throws {
+        try? await AppStore.sync()
+        await updatePurchasedStatus()
     }
     
     @MainActor
     private func process(transaction: StoreKit.Transaction) {
         if transaction.productID == productID {
-            setPremiumStatus(true)
+            // Check for revocation (refund) date
+            if transaction.revocationDate == nil {
+                setPremiumStatus(true)
+            } else {
+                setPremiumStatus(false)
+            }
         }
     }
     
@@ -321,18 +334,229 @@ struct FireEffectView: View {
     }
 }
 
+// Wrapper class for individual tracks to handle seamless crossfade looping
+class SoundTrack: NSObject {
+    private var players: [AVAudioPlayer] = []
+    private var activePlayerIndex = 0
+    
+    var individualVolume: Float = 0.5
+    var masterVolume: Float = 1.0
+    var randomVolumeMultiplier: Float = 1.0 // New: randomized modulation
+    var fileName: String
+    
+    private var crossfadeTimer: Timer?
+    // Overlap duration in seconds to create seamless loop
+    private let crossfadeDuration: TimeInterval = 2.5
+    private var isPlaying: Bool = false
+    
+    // Animation timers
+    private var volumeFadeTimer: Timer?
+    private var panFadeTimer: Timer?
+    
+    init(fileName: String) {
+        self.fileName = fileName
+        super.init()
+        setupPlayers()
+    }
+    
+    private func setupPlayers() {
+        // Updated to search for multiple extensions
+        let extensions = ["mp3", "wav", "m4a", "aac", "caf"]
+        var fileURL: URL?
+        
+        for ext in extensions {
+            if let url = Bundle.main.url(forResource: fileName, withExtension: ext) {
+                fileURL = url
+                break
+            }
+        }
+        
+        guard let url = fileURL else {
+            print("Error: Could not find audio file for \(fileName) with any supported extension.")
+            return
+        }
+        
+        // Initialize two players for the same file to allow overlapping
+        for _ in 0..<2 {
+            do {
+                let p = try AVAudioPlayer(contentsOf: url)
+                p.numberOfLoops = 0
+                p.prepareToPlay()
+                players.append(p)
+            } catch {
+                print("Error loading \(fileName) from \(url.lastPathComponent): \(error)")
+            }
+        }
+    }
+    
+    func play() {
+        guard !isPlaying, !players.isEmpty else { return }
+        isPlaying = true
+        
+        let p = players[activePlayerIndex]
+        if !p.isPlaying {
+            p.currentTime = 0
+            p.volume = 0
+            p.play()
+            p.setVolume(currentVolume, fadeDuration: 1.0) // Initial fade in
+            scheduleCrossfade(for: p)
+        }
+    }
+    
+    func pause() {
+        isPlaying = false
+        crossfadeTimer?.invalidate()
+        volumeFadeTimer?.invalidate()
+        panFadeTimer?.invalidate()
+        
+        // Fade out all playing players
+        for p in players where p.isPlaying {
+            p.setVolume(0, fadeDuration: 0.5)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !self.isPlaying {
+                for p in self.players { p.pause() }
+            }
+        }
+    }
+    
+    func setVolumes(individual: Float, master: Float) {
+        self.individualVolume = individual
+        self.masterVolume = master
+        
+        if isPlaying {
+            let active = players[activePlayerIndex]
+            if active.isPlaying {
+                // Smoothly update to new volume (including current random multiplier)
+                active.setVolume(currentVolume, fadeDuration: 0.2)
+            }
+        }
+    }
+    
+    // Smoothly fade the random volume multiplier
+    func fadeRandomVolume(to target: Float, duration: TimeInterval) {
+        volumeFadeTimer?.invalidate()
+        
+        let start = randomVolumeMultiplier
+        let steps = Int(duration * 20) // 20 updates per second
+        let stepAmount = (target - start) / Float(steps)
+        var currentStep = 0
+        
+        volumeFadeTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            currentStep += 1
+            self.randomVolumeMultiplier = start + (stepAmount * Float(currentStep))
+            
+            // Apply new volume to active player
+            if self.isPlaying {
+                let active = self.players[self.activePlayerIndex]
+                if active.isPlaying {
+                    active.setVolume(self.currentVolume, fadeDuration: 0.05)
+                }
+            }
+            
+            if currentStep >= steps {
+                timer.invalidate()
+            }
+        }
+    }
+    
+    // Smoothly fade pan
+    func fadePan(to target: Float, duration: TimeInterval) {
+        panFadeTimer?.invalidate()
+        
+        let start = players.first?.pan ?? 0.0
+        let steps = Int(duration * 20)
+        let stepAmount = (target - start) / Float(steps)
+        var currentStep = 0
+        
+        panFadeTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            currentStep += 1
+            let newPan = start + (stepAmount * Float(currentStep))
+            
+            for p in self.players { p.pan = newPan }
+            
+            if currentStep >= steps {
+                timer.invalidate()
+            }
+        }
+    }
+    
+    func setPan(_ pan: Float) {
+        panFadeTimer?.invalidate()
+        for p in players { p.pan = pan }
+    }
+    
+    var currentVolume: Float {
+        return individualVolume * masterVolume * randomVolumeMultiplier
+    }
+    
+    private func scheduleCrossfade(for player: AVAudioPlayer) {
+        crossfadeTimer?.invalidate()
+        
+        // Calculate when to start the next player
+        // It should start 'crossfadeDuration' before the current one ends
+        let delay = player.duration - player.currentTime - crossfadeDuration
+        
+        guard delay > 0 else {
+            // File is too short for the requested crossfade, just loop immediately
+            performCrossfade()
+            return
+        }
+        
+        crossfadeTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            self?.performCrossfade()
+        }
+    }
+    
+    private func performCrossfade() {
+        guard isPlaying, !players.isEmpty else { return }
+        
+        // 1. Identify current (outgoing) and next (incoming)
+        let outgoingPlayer = players[activePlayerIndex]
+        let nextIndex = (activePlayerIndex + 1) % players.count
+        let incomingPlayer = players[nextIndex]
+        
+        // 2. Start Incoming
+        incomingPlayer.currentTime = 0
+        incomingPlayer.volume = 0
+        incomingPlayer.play()
+        incomingPlayer.setVolume(currentVolume, fadeDuration: crossfadeDuration)
+        
+        // 3. Fade Out Outgoing
+        outgoingPlayer.setVolume(0, fadeDuration: crossfadeDuration)
+        
+        // 4. Update Index
+        activePlayerIndex = nextIndex
+        
+        // 5. Schedule next cycle
+        scheduleCrossfade(for: incomingPlayer)
+        
+        // 6. Stop the outgoing player after fade completes to save resources
+        // Adding a small buffer to ensure fade completes
+        DispatchQueue.main.asyncAfter(deadline: .now() + crossfadeDuration + 0.2) {
+            if self.isPlaying { // Only stop if we haven't paused globally
+                outgoingPlayer.pause()
+                outgoingPlayer.currentTime = 0
+            }
+        }
+    }
+}
+
 class AudioEngineManager: ObservableObject {
-    private var players: [AVAudioPlayer?] = []
+    private var tracks: [SoundTrack] = []
     private let fileNames = ["rain", "fireplace", "umbrella", "Blizzard", "ocean"]
     private var individualVolumes: [Float] = []
     
     private var wasPlayingWhenBackgrounded = false
-    private var randomizerTimer: Timer?
-    private var isPanLeft = true
-    
     private var usageTimer: Timer?
     @Published var continuousPlayTime: TimeInterval = 0
     @Published var showPremiumUpsell = false
+    
+    // Tasks for Randomizer
+    private var volumeTask: Task<Void, Never>?
+    private var oscillationTask: Task<Void, Never>?
     
     @Published var isBackgroundAudioEnabled: Bool {
         didSet {
@@ -373,8 +597,12 @@ class AudioEngineManager: ObservableObject {
             updateNowPlayingInfo()
             if isPlaying {
                 startUsageTracking()
+                updateRandomizerState()
             } else {
                 stopUsageTracking()
+                // Pause randomizer effects when playback stops
+                volumeTask?.cancel()
+                oscillationTask?.cancel()
             }
         }
     }
@@ -395,16 +623,16 @@ class AudioEngineManager: ObservableObject {
         individualVolumes = Array(repeating: 0.5, count: fileNames.count)
         
         configureAudioSession()
-        setupPlayers()
+        setupTracks()
         setupInterruptionObserver()
         setupRemoteTransportControls()
         setupLifecycleObservers()
-        updateRandomizerState()
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
-        randomizerTimer?.invalidate()
+        volumeTask?.cancel()
+        oscillationTask?.cancel()
         usageTimer?.invalidate()
     }
     
@@ -434,10 +662,15 @@ class AudioEngineManager: ObservableObject {
     private func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            var options: AVAudioSession.CategoryOptions = [.allowAirPlay]
+            
+            // Start with empty options. .allowAirPlay is default for .playback so we don't need to force it,
+            // which often causes -50 errors on some devices/simulators when explicitly set.
+            var options: AVAudioSession.CategoryOptions = []
+            
             if isBackgroundAudioEnabled && isMixerModeEnabled {
                 options.insert(.mixWithOthers)
             }
+            
             try session.setCategory(.playback, mode: .default, options: options)
             try session.setActive(true)
         } catch {
@@ -495,90 +728,83 @@ class AudioEngineManager: ObservableObject {
         }
     }
     
-    private func setupPlayers() {
-        players.removeAll()
-        for (index, fileName) in fileNames.enumerated() {
-            guard let url = Bundle.main.url(forResource: fileName, withExtension: "mp3") else {
-                players.append(nil)
-                continue
-            }
-            do {
-                let player = try AVAudioPlayer(contentsOf: url)
-                player.numberOfLoops = -1
-                let vol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
-                player.volume = vol * masterVolume
-                player.prepareToPlay()
-                players.append(player)
-            } catch {
-                players.append(nil)
-            }
+    private func setupTracks() {
+        tracks.removeAll()
+        for fileName in fileNames {
+            let track = SoundTrack(fileName: fileName)
+            tracks.append(track)
         }
     }
     
     private func updateRandomizerState() {
-        randomizerTimer?.invalidate()
-        randomizerTimer = nil
-        if isRandomVolumeEnabled || isRandomOscillationEnabled {
-            randomizerTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-                self?.handleRandomizerTick()
-            }
+        // Cancel existing tasks
+        volumeTask?.cancel()
+        oscillationTask?.cancel()
+        
+        guard isPlaying else { return }
+        
+        if isRandomVolumeEnabled {
+            startRandomVolumeLoop()
         } else {
-            resetRandomizerEffects()
+            // Reset to 1.0 slowly
+            for track in tracks {
+                track.fadeRandomVolume(to: 1.0, duration: 1.0)
+            }
+        }
+        
+        if isRandomOscillationEnabled {
+            startRandomOscillationLoop()
+        } else {
+            // Center pan slowly
+            for track in tracks {
+                track.fadePan(to: 0.0, duration: 1.0)
+            }
         }
     }
     
-    private func handleRandomizerTick() {
-        guard isPlaying else { return }
-        isPanLeft.toggle()
-        for (index, player) in players.enumerated() {
-            guard let player = player else { continue }
-            let baseVol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
-            let calculatedBaseVolume = baseVol * masterVolume
-            
-            if isRandomVolumeEnabled {
-                let randomMultiplier = Float.random(in: 0.2...1.8)
-                let randomVolume = max(0.0, min(1.0, calculatedBaseVolume * randomMultiplier))
-                player.setVolume(randomVolume, fadeDuration: 0.5)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    if self.isRandomVolumeEnabled && self.isPlaying {
-                        player.setVolume(calculatedBaseVolume, fadeDuration: 2.0)
+    private func startRandomVolumeLoop() {
+        volumeTask = Task {
+            while !Task.isCancelled {
+                // Wait random interval: 3s to 45s
+                let interval = Double.random(in: 3...45)
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                
+                if Task.isCancelled { break }
+                
+                // Random target: 70% to 130%
+                let targetMultiplier = Float.random(in: 0.7...1.3)
+                // Fade duration
+                let fadeTime = Double.random(in: 2.0...4.0)
+                
+                await MainActor.run {
+                    for track in tracks {
+                        track.fadeRandomVolume(to: targetMultiplier, duration: fadeTime)
                     }
                 }
-            } else {
-                if abs(player.volume - calculatedBaseVolume) > 0.01 {
-                    player.setVolume(calculatedBaseVolume, fadeDuration: 1.0)
-                }
-            }
-            
-            if isRandomOscillationEnabled {
-                let targetPan: Float = isPanLeft ? -0.8 : 0.8
-                smoothPan(player: player, to: targetPan, duration: 2.0)
-            } else {
-                if player.pan != 0.0 { player.pan = 0.0 }
             }
         }
     }
     
-    private func smoothPan(player: AVAudioPlayer, to target: Float, duration: TimeInterval) {
-        let steps = 30
-        let interval = duration / Double(steps)
-        let startPan = player.pan
-        let delta = (target - startPan) / Float(steps)
-        for i in 1...steps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + (interval * Double(i))) {
-                if self.isRandomOscillationEnabled && self.isPlaying {
-                    player.pan = startPan + (delta * Float(i))
+    private func startRandomOscillationLoop() {
+        oscillationTask = Task {
+            while !Task.isCancelled {
+                // Wait random interval: 3s to 45s
+                let interval = Double.random(in: 3...45)
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                
+                if Task.isCancelled { break }
+                
+                // Random target: -0.7 (Left 70%) to 0.7 (Right 70%)
+                let targetPan = Float.random(in: -0.7...0.7)
+                // Fade duration
+                let fadeTime = Double.random(in: 2.0...5.0)
+                
+                await MainActor.run {
+                    for track in tracks {
+                        track.fadePan(to: targetPan, duration: fadeTime)
+                    }
                 }
             }
-        }
-    }
-    
-    private func resetRandomizerEffects() {
-        for (index, player) in players.enumerated() {
-            guard let player = player else { continue }
-            let baseVol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
-            player.setVolume(baseVol * masterVolume, fadeDuration: 1.0)
-            player.pan = 0.0
         }
     }
     
@@ -627,15 +853,15 @@ class AudioEngineManager: ObservableObject {
     func setVolume(for index: Int, volume: Float) {
         guard index < individualVolumes.count else { return }
         individualVolumes[index] = volume
-        if index < players.count, let player = players[index] {
-            player.volume = individualVolumes[index] * masterVolume
+        if index < tracks.count {
+            tracks[index].setVolumes(individual: volume, master: masterVolume)
         }
     }
     
     private func updateAllVolumes() {
-        for (index, player) in players.enumerated() {
-            guard let player = player else { continue }
-            player.volume = individualVolumes[index] * masterVolume
+        for (index, track) in tracks.enumerated() {
+            let vol = (index < individualVolumes.count) ? individualVolumes[index] : 0.5
+            track.setVolumes(individual: vol, master: masterVolume)
         }
     }
     
@@ -645,12 +871,12 @@ class AudioEngineManager: ObservableObject {
     
     func play() {
         configureAudioSession()
-        for player in players { player?.play() }
+        for track in tracks { track.play() }
         isPlaying = true
     }
     
     func stop() {
-        for player in players { player?.pause() }
+        for track in tracks { track.pause() }
         isPlaying = false
     }
 }
@@ -874,7 +1100,9 @@ struct PremiumUpsellView: View {
                     }
                     
                     Button("Restore Purchases") {
-                        purchaseManager.restorePurchases()
+                        Task {
+                            try? await purchaseManager.restorePurchases()
+                        }
                     }
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.6))
@@ -935,6 +1163,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var audioManager: AudioEngineManager
     @State private var showUpsell = false
+    @State private var showRestoreAlert = false
     
     var body: some View {
         NavigationView {
@@ -943,11 +1172,33 @@ struct SettingsView: View {
                 List {
                     Section {
                         if PurchaseManager.shared.isPremium {
-                            HStack { Image(systemName: "checkmark.seal.fill").foregroundColor(.orange); Text("Premium Unlocked").foregroundColor(.orange) }
+                            Menu {
+                                Button(action: {
+                                    Task {
+                                        try? await PurchaseManager.shared.restorePurchases()
+                                        showRestoreAlert = true
+                                    }
+                                }) {
+                                    Label("Restore Purchases", systemImage: "arrow.clockwise")
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "checkmark.seal.fill").foregroundColor(.orange)
+                                    Text("Premium Unlocked").foregroundColor(.orange)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.caption).foregroundColor(.gray)
+                                }
+                            }
                         } else {
                             Button(action: { showUpsell = true }) {
                                 HStack { Image(systemName: "crown.fill").foregroundColor(.orange); Text("Unlock Premium").foregroundColor(.white) }
                             }
+                        }
+                    } header: {
+                        Text("Membership").foregroundColor(.gray)
+                    } footer: {
+                        if PurchaseManager.shared.isPremium {
+                            Text("Tap 'Premium Unlocked' to manage options. If you request a refund via Apple, you will lose access to premium features upon approval.").foregroundColor(.gray)
                         }
                     }
                     .listRowBackground(Color.white.opacity(0.1))
@@ -976,6 +1227,13 @@ struct SettingsView: View {
             }
             .fullScreenCover(isPresented: $showUpsell) {
                 PremiumUpsellView(audioManager: audioManager)
+            }
+            .alert(isPresented: $showRestoreAlert) {
+                Alert(
+                    title: Text("Restore Complete"),
+                    message: Text(PurchaseManager.shared.isPremium ? "Your purchases have been restored." : "No previous purchases were found."),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -1015,13 +1273,13 @@ struct RandomizerSettingsView: View {
                 Section {
                     Toggle("Random Volume", isOn: $audioManager.isRandomVolumeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 } header: { Text("Volume Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, randomly, every 5 seconds, there will be a noticeable volume increase or decrease to create a dynamic experience.").foregroundColor(.gray)
+                    Text("If enabled, the volume will naturally fade between 70% and 130% of your set volume at random intervals (3s - 45s).").foregroundColor(.gray)
                 }
                 .listRowBackground(Color.white.opacity(0.1))
                 Section {
                     Toggle("Random Oscillation", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 } header: { Text("Pan Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, every 5 seconds the audio will alternate between the left and right speakers.").foregroundColor(.gray)
+                    Text("If enabled, the audio will naturally drift between left and right speakers at random intervals (3s - 45s).").foregroundColor(.gray)
                 }
                 .listRowBackground(Color.white.opacity(0.1))
             }.scrollContentBackground(.hidden)
