@@ -360,33 +360,65 @@ class SoundTrack: NSObject {
     }
     
     private func setupPlayers() {
-        // Updated to search for multiple extensions
-        let extensions = ["mp3", "wav", "m4a", "aac", "caf"]
-        var fileURL: URL?
+        // Updated to search for multiple extensions and verify loading with type hints
+        let extensions = ["mp3", "wav", "m4a", "aac", "caf", "aiff", "flac"]
         
         for ext in extensions {
             if let url = Bundle.main.url(forResource: fileName, withExtension: ext) {
-                fileURL = url
-                break
+                if attemptLoad(url: url) {
+                    print("Successfully loaded \(fileName).\(ext)")
+                    return
+                } else {
+                    print("Failed to load \(fileName).\(ext) - format mismatch/unsupported.")
+                }
             }
         }
         
-        guard let url = fileURL else {
-            print("Error: Could not find audio file for \(fileName) with any supported extension.")
-            return
+        print("Error: Could not find or load valid audio file for \(fileName)")
+    }
+    
+    private func attemptLoad(url: URL) -> Bool {
+        // 1. Try standard load (trusting extension)
+        if let players = try? createPlayers(url: url, hint: nil) {
+            self.players = players
+            return true
         }
         
-        // Initialize two players for the same file to allow overlapping
+        // 2. Try brute force hints (fix for renamed files or format mismatches)
+        // Common audio UTIs
+        let hints: [String] = [
+            AVFileType.mp3.rawValue,
+            AVFileType.wav.rawValue,
+            AVFileType.m4a.rawValue,
+            AVFileType.aiff.rawValue,
+            AVFileType.caf.rawValue
+        ]
+        
+        for hint in hints {
+            if let players = try? createPlayers(url: url, hint: hint) {
+                self.players = players
+                print("Recovered \(url.lastPathComponent) using hint: \(hint)")
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private func createPlayers(url: URL, hint: String?) throws -> [AVAudioPlayer] {
+        var newPlayers: [AVAudioPlayer] = []
         for _ in 0..<2 {
-            do {
-                let p = try AVAudioPlayer(contentsOf: url)
-                p.numberOfLoops = 0
-                p.prepareToPlay()
-                players.append(p)
-            } catch {
-                print("Error loading \(fileName) from \(url.lastPathComponent): \(error)")
+            let p: AVAudioPlayer
+            if let hint = hint {
+                p = try AVAudioPlayer(contentsOf: url, fileTypeHint: hint)
+            } else {
+                p = try AVAudioPlayer(contentsOf: url)
             }
+            p.numberOfLoops = 0
+            p.prepareToPlay()
+            newPlayers.append(p)
         }
+        return newPlayers
     }
     
     func play() {
@@ -1392,21 +1424,19 @@ struct ContentView: View {
                 }) {
                     ZStack {
                         Circle().fill(LinearGradient(
-                            colors: (audioManager.isPlaying && isAnyBulbOn) ? [Color.blue.opacity(0.6), Color.purple.opacity(0.6)] : [Color.gray.opacity(0.3), Color.gray.opacity(0.1)],
+                            colors: (audioManager.isPlaying) ? [Color.blue.opacity(0.6), Color.purple.opacity(0.6)] : [Color.gray.opacity(0.3), Color.gray.opacity(0.1)],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ))
                         .frame(width: 120, height: 120)
-                        .shadow(color: (audioManager.isPlaying && isAnyBulbOn) ? .blue.opacity(0.5) : .clear, radius: 20, x: 0, y: 0)
-                        .opacity(isAnyBulbOn ? 1.0 : 0.3).grayscale(isAnyBulbOn ? 0.0 : 1.0)
+                        .shadow(color: (audioManager.isPlaying) ? .blue.opacity(0.5) : .clear, radius: 20, x: 0, y: 0)
+                        .opacity(1.0).grayscale(0.0)
                         
                         Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 40)).foregroundColor(.white.opacity(isAnyBulbOn ? 1.0 : 0.5))
+                            .font(.system(size: 40)).foregroundColor(.white.opacity(1.0))
                     }
                 }
-                .disabled(!isAnyBulbOn)
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
                 .animation(.spring(response: 0.4, dampingFraction: 0.6), value: audioManager.isPlaying)
-                .animation(.easeInOut, value: isAnyBulbOn)
                 
                 Spacer(minLength: 20)
                 
@@ -1449,7 +1479,7 @@ struct ContentView: View {
             )
         }
         .onChange(of: isAnyBulbOn) { _, newValue in
-            if !newValue && audioManager.isPlaying { audioManager.stop() }
+            // Removed auto-stop logic
         }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
             PremiumUpsellView(audioManager: audioManager)
