@@ -1547,11 +1547,11 @@ struct ContentView: View {
                     HStack(spacing: 8) {
                         ZStack {
                             Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            Circle().trim(from: 0, to: CGFloat(timerManager.progress)).stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 14, height: 14)
-                        }.frame(width: 14, height: 14)
-                        Text(timerManager.formattedTime).font(.system(size: 14, weight: .medium)).monospacedDigit()
+                            Circle().trim(from: 0, to: CGFloat(timerManager.progress)).stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 20, height: 20)
+                        }.frame(width: 20, height: 20)
+                        Text(timerManager.formattedTime).font(.system(size: 24, weight: .medium)).monospacedDigit()
                     }
-                    .padding(.horizontal, 12).padding(.vertical, 6).background(Color.white.opacity(0.15)).clipShape(Capsule()).foregroundColor(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 8).background(Color.white.opacity(0.15)).clipShape(Capsule()).foregroundColor(.white)
                 }
                 .padding(.top, 40).opacity(timerManager.isTimerActive ? 1.0 : 0.0).disabled(!timerManager.isTimerActive).animation(.easeInOut, value: timerManager.isTimerActive)
                 
@@ -1598,8 +1598,8 @@ struct ContentView: View {
                 
                 Spacer(minLength: 20)
                 
-                HStack(alignment: .center, spacing: 20) {
-                    // Random Button
+                HStack(alignment: .center, spacing: 30) {
+                    // 1. Random Button (Smaller)
                     Button(action: randomizeMix) {
                         Image(systemName: "dice.fill")
                             .font(.system(size: 20))
@@ -1612,27 +1612,7 @@ struct ContentView: View {
                             .scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
                     
-                    AirPlayButton()
-                        .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                        if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
-                    }) {
-                        Image(systemName: "timer").font(.system(size: 26)).foregroundColor(timerManager.isTimerActive ? .orange : .white)
-                            .frame(width: 64, height: 64).background(Color.white.opacity(0.1)).clipShape(Circle())
-                            .overlay(Circle().stroke(timerManager.isTimerActive ? Color.orange : Color.white.opacity(0.3), lineWidth: timerManager.isTimerActive ? 2 : 1))
-                    }
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundColor(.white.opacity(0.7))
-                            .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
-                    }
-                    
-                    // Profile Button
+                    // 2. Profiles Button (Medium)
                     Button(action: {
                         showProfiles = true
                     }) {
@@ -1642,6 +1622,50 @@ struct ContentView: View {
                             .frame(width: 44, height: 44)
                             .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    }
+                    
+                    // 3. Timer Button (Large/Center)
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                        if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
+                    }) {
+                        Image(systemName: "timer").font(.system(size: 26)).foregroundColor(timerManager.isTimerActive ? .orange : .white)
+                            .frame(width: 64, height: 64).background(Color.white.opacity(0.1)).clipShape(Circle())
+                            .overlay(Circle().stroke(timerManager.isTimerActive ? Color.orange : Color.white.opacity(0.3), lineWidth: timerManager.isTimerActive ? 2 : 1))
+                    }
+                    .contentShape(Circle()) // Fixes the context menu preview artifact
+                    .zIndex(1)
+                    .contextMenu {
+                        Button {
+                            timerManager.startTimer(duration: 15 * 60)
+                        } label: {
+                            Text("15 Minutes")
+                        }
+                        Button {
+                            timerManager.startTimer(duration: 30 * 60)
+                        } label: {
+                            Text("30 Minutes")
+                        }
+                        Button {
+                            timerManager.startTimer(duration: 60 * 60)
+                        } label: {
+                            Text("60 Minutes")
+                        }
+                    }
+                    
+                    // 4. AirPlay Button (Medium)
+                    AirPlayButton()
+                        .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    
+                    // 5. Settings Button (Smaller)
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundColor(.white.opacity(0.7))
+                            .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle())
                             .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
                     }
                 }
