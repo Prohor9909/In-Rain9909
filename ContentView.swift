@@ -810,6 +810,7 @@ class AudioEngineManager: ObservableObject {
                 
                 await MainActor.run {
                     for track in tracks {
+                        if track.fileName == "fireplace" { continue }
                         track.fadeRandomVolume(to: targetMultiplier, duration: fadeTime)
                     }
                 }
@@ -833,6 +834,7 @@ class AudioEngineManager: ObservableObject {
                 
                 await MainActor.run {
                     for track in tracks {
+                        if track.fileName == "fireplace" { continue }
                         track.fadePan(to: targetPan, duration: fadeTime)
                     }
                 }
@@ -1216,21 +1218,21 @@ struct SettingsView: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "checkmark.seal.fill").foregroundColor(.orange)
-                                    Text("Premium Unlocked").foregroundColor(.orange)
+                                    Text("Full Version").foregroundColor(.orange)
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.caption).foregroundColor(.gray)
                                 }
                             }
                         } else {
                             Button(action: { showUpsell = true }) {
-                                HStack { Image(systemName: "crown.fill").foregroundColor(.orange); Text("Unlock Premium").foregroundColor(.white) }
+                                HStack { Image(systemName: "crown.fill").foregroundColor(.orange); Text("Trial Version").foregroundColor(.white) }
                             }
                         }
                     } header: {
                         Text("Membership").foregroundColor(.gray)
                     } footer: {
                         if PurchaseManager.shared.isPremium {
-                            Text("Tap 'Premium Unlocked' to manage options. If you request a refund via Apple, you will lose access to premium features upon approval.").foregroundColor(.gray)
+                            Text("Tap 'Full Version' to manage options. If you request a refund via Apple, you will lose access to premium features upon approval.").foregroundColor(.gray)
                         }
                     }
                     .listRowBackground(Color.white.opacity(0.1))
@@ -1246,7 +1248,7 @@ struct SettingsView: View {
                     .listRowBackground(Color.white.opacity(0.1))
                     
                     NavigationLink(destination: ParticleSettingsView(audioManager: audioManager)) {
-                        HStack { Image(systemName: "sparkles").foregroundColor(.white).frame(width: 24); Text("Particle Effects").foregroundColor(.white) }
+                        HStack { Image(systemName: "sparkles").foregroundColor(.white).frame(width: 24); Text("Beta Features").foregroundColor(.white) }
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                 }
@@ -1328,11 +1330,11 @@ struct ParticleSettingsView: View {
                 Section {
                     Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 } header: { Text("Visual Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, visual particle effects like rain and fire will be displayed on the main screen corresponding to active sounds.").foregroundColor(.gray)
+                    Text("These features are currently in beta. They are fully functional but still under development.").foregroundColor(.gray)
                 }
                 .listRowBackground(Color.white.opacity(0.1))
             }.scrollContentBackground(.hidden)
-        }.navigationTitle("Particle Effects")
+        }.navigationTitle("Beta Features")
     }
 }
 
@@ -1347,16 +1349,172 @@ struct AirPlayButton: UIViewRepresentable {
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }
 
+struct SoundProfile: Identifiable, Codable {
+    let id: UUID
+    let name: String
+    let bulbValues: [Double]
+    let bulbToggles: [Bool]
+}
+
+class ProfileManager: ObservableObject {
+    @Published var profiles: [SoundProfile] = [] {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(profiles) {
+                UserDefaults.standard.set(encoded, forKey: "saved_sound_profiles")
+            }
+        }
+    }
+    
+    init() {
+        if let data = UserDefaults.standard.data(forKey: "saved_sound_profiles"),
+           let decoded = try? JSONDecoder().decode([SoundProfile].self, from: data) {
+            profiles = decoded
+        }
+    }
+    
+    func saveProfile(name: String, values: [Double], toggles: [Bool]) {
+        let newProfile = SoundProfile(id: UUID(), name: name, bulbValues: values, bulbToggles: toggles)
+        profiles.append(newProfile)
+    }
+    
+    func deleteProfile(at offsets: IndexSet) {
+        profiles.remove(atOffsets: offsets)
+    }
+    
+    func updateProfile(id: UUID, newName: String) {
+        if let index = profiles.firstIndex(where: { $0.id == id }) {
+            let old = profiles[index]
+            profiles[index] = SoundProfile(id: old.id, name: newName, bulbValues: old.bulbValues, bulbToggles: old.bulbToggles)
+        }
+    }
+}
+
+struct ProfilesView: View {
+    @ObservedObject var profileManager: ProfileManager
+    @Environment(\.dismiss) var dismiss
+    @Binding var currentValues: [Double]
+    @Binding var currentToggles: [Bool]
+    var onApply: () -> Void
+    
+    @State private var newName = ""
+    @State private var isCreating = false
+    @State private var showRenameAlert = false
+    @State private var profileToRename: SoundProfile? = nil
+    @State private var renameText = ""
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
+                
+                VStack {
+                    if isCreating {
+                        HStack {
+                            TextField("Name", text: $newName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .foregroundColor(.white)
+                            Button("Save") {
+                                if !newName.isEmpty {
+                                    profileManager.saveProfile(name: newName, values: currentValues, toggles: currentToggles)
+                                    newName = ""
+                                    isCreating = false
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(10)
+                        .padding()
+                    } else {
+                        Button(action: { isCreating = true }) {
+                            Label("Save Current Mix", systemImage: "plus")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.orange.opacity(0.8))
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
+                        .padding()
+                    }
+                    
+                    List {
+                        ForEach(profileManager.profiles) { profile in
+                            HStack {
+                                Text(profile.name)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Button(action: {
+                                    currentValues = profile.bulbValues
+                                    currentToggles = profile.bulbToggles
+                                    onApply()
+                                    dismiss()
+                                }) {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            .listRowBackground(Color.white.opacity(0.1))
+                            .contextMenu {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    if let index = profileManager.profiles.firstIndex(where: { $0.id == profile.id }) {
+                                        profileManager.deleteProfile(at: IndexSet(integer: index))
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .onDelete(perform: profileManager.deleteProfile)
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .navigationTitle("Sound Profiles")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }.foregroundColor(.white)
+                }
+            }
+            .alert("Rename Profile", isPresented: $showRenameAlert) {
+                TextField("New Name", text: $renameText)
+                Button("Save") {
+                    if let profile = profileToRename {
+                        profileManager.updateProfile(id: profile.id, newName: renameText)
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
 struct ContentView: View {
     @StateObject private var audioManager = AudioEngineManager()
     @StateObject private var timerManager = TimerManager()
+    @StateObject private var profileManager = ProfileManager()
+    
     @State private var showCustomTimerSheet = false
     @State private var showTimerDetail = false
     @State private var showStopConfirmation = false
     @State private var showSettings = false
+    @State private var showProfiles = false
     
     @State private var bulbValues: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
     @State private var bulbToggles: [Bool] = [false, false, false, false, false]
+    @State private var isRandomizing = false
+    @State private var shuffleRotation = 0.0
     
     let sliderIcons = ["cloud.rain.fill", "flame.fill", "umbrella.fill", "wind.snow", "water.waves"]
     let sliderColors: [[Color]] = [
@@ -1440,7 +1598,20 @@ struct ContentView: View {
                 
                 Spacer(minLength: 20)
                 
-                HStack(alignment: .center, spacing: 40) {
+                HStack(alignment: .center, spacing: 20) {
+                    // Random Button
+                    Button(action: randomizeMix) {
+                        Image(systemName: "dice.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                            .rotationEffect(.degrees(shuffleRotation))
+                            .scaleEffect(isRandomizing ? 1.5 : 1.0)
+                    }
+                    
                     AirPlayButton()
                         .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
                     
@@ -1460,6 +1631,19 @@ struct ContentView: View {
                         Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundColor(.white.opacity(0.7))
                             .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
                     }
+                    
+                    // Profile Button
+                    Button(action: {
+                        showProfiles = true
+                    }) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    }
                 }
                 .padding(.bottom, 40).frame(maxWidth: .infinity).animation(.spring(), value: timerManager.isTimerActive)
             }
@@ -1471,6 +1655,18 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showCustomTimerSheet) { CustomTimerSheet(timerManager: timerManager, audioManager: audioManager) }
         .sheet(isPresented: $showTimerDetail) { FullScreenTimerView(timerManager: timerManager) }
+        .sheet(isPresented: $showProfiles) {
+            ProfilesView(
+                profileManager: profileManager,
+                currentValues: $bulbValues,
+                currentToggles: $bulbToggles,
+                onApply: {
+                    for i in 0..<bulbValues.count {
+                        updateVolume(for: i)
+                    }
+                }
+            )
+        }
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
         .alert(isPresented: $showStopConfirmation) {
             Alert(
@@ -1483,6 +1679,51 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
             PremiumUpsellView(audioManager: audioManager)
+        }
+    }
+    
+    private func randomizeMix() {
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        
+        // Adjusted: 1 full spin (360 deg) over 0.8 seconds. Faster but still smooth.
+        withAnimation(.easeInOut(duration: 0.8)) {
+            shuffleRotation += 360
+        }
+        
+        // Scale up
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+            isRandomizing = true
+        }
+        
+        // Scale down faster to match new duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                isRandomizing = false
+            }
+        }
+        
+        // Separate animation for the sliders updating, so they don't necessarily take 1.5 seconds
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+            // Reset
+            for i in 0..<bulbValues.count {
+                bulbValues[i] = 0.0
+                bulbToggles[i] = false
+            }
+            
+            // Randomize 1 to 4 active sounds
+            let count = Int.random(in: 1...4)
+            let indices = Array(0..<bulbValues.count).shuffled().prefix(count)
+            
+            for idx in indices {
+                bulbToggles[idx] = true
+                bulbValues[idx] = Double.random(in: 0.3...0.9)
+            }
+        }
+        
+        // Update audio
+        for i in 0..<bulbValues.count {
+            updateVolume(for: i)
         }
     }
     
