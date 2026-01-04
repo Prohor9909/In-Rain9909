@@ -1204,6 +1204,7 @@ struct SettingsView: View {
             ZStack {
                 Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
                 List {
+                    // Membership Status Section
                     Section {
                         if PurchaseManager.shared.isPremium {
                             Menu {
@@ -1229,26 +1230,56 @@ struct SettingsView: View {
                             }
                         }
                     } header: {
-                        Text("Membership").foregroundColor(.gray)
+                        Text("Membership Status").foregroundColor(.gray)
+                    }
+                    .listRowBackground(Color.white.opacity(0.1))
+                    
+                    // Background Audio Section
+                    Section {
+                        Toggle("Background Audio", isOn: $audioManager.isBackgroundAudioEnabled)
+                            .toggleStyle(SwitchToggleStyle(tint: .green))
+                            .foregroundColor(.white)
+                        
+                        if audioManager.isBackgroundAudioEnabled {
+                            Toggle("Mixer Mode", isOn: $audioManager.isMixerModeEnabled)
+                                .toggleStyle(SwitchToggleStyle(tint: .green))
+                                .foregroundColor(.white)
+                        }
+                    } header: {
+                        Text("Background Audio").foregroundColor(.gray)
                     } footer: {
-                        if PurchaseManager.shared.isPremium {
-                            Text("Tap 'Full Version' to manage options. If you request a refund via Apple, you will lose access to premium features upon approval.").foregroundColor(.gray)
+                        if audioManager.isBackgroundAudioEnabled {
+                            Text("Mixer Mode allows audio to play simultaneously with other apps.").foregroundColor(.gray)
+                        } else {
+                            Text("Audio will stop when the app is in the background.").foregroundColor(.gray)
                         }
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                     
-                    NavigationLink(destination: BackgroundAudioSettingsView(audioManager: audioManager)) {
-                        HStack { Image(systemName: "speaker.wave.2.fill").foregroundColor(.white).frame(width: 24); Text("Background Audio").foregroundColor(.white) }
+                    // Randomizer Section
+                    Section {
+                        Toggle("Random Volume", isOn: $audioManager.isRandomVolumeEnabled)
+                            .toggleStyle(SwitchToggleStyle(tint: .green))
+                            .foregroundColor(.white)
+                        Toggle("Random Oscillation", isOn: $audioManager.isRandomOscillationEnabled)
+                            .toggleStyle(SwitchToggleStyle(tint: .green))
+                            .foregroundColor(.white)
+                    } header: {
+                        Text("Randomizer").foregroundColor(.gray)
+                    } footer: {
+                        Text("Volume fades (70%-130%). Oscillation drifts audio (Left-Right).").foregroundColor(.gray)
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                     
-                    NavigationLink(destination: RandomizerSettingsView(audioManager: audioManager)) {
-                        HStack { Image(systemName: "shuffle").foregroundColor(.white).frame(width: 24); Text("Randomizer").foregroundColor(.white) }
-                    }
-                    .listRowBackground(Color.white.opacity(0.1))
-                    
-                    NavigationLink(destination: ParticleSettingsView(audioManager: audioManager)) {
-                        HStack { Image(systemName: "sparkles").foregroundColor(.white).frame(width: 24); Text("Beta Features").foregroundColor(.white) }
+                    // Beta Features Section
+                    Section {
+                        Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled)
+                            .toggleStyle(SwitchToggleStyle(tint: .green))
+                            .foregroundColor(.white)
+                    } header: {
+                        Text("Beta Features").foregroundColor(.gray)
+                    } footer: {
+                        Text("These features are currently in beta.").foregroundColor(.gray)
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                 }
@@ -1271,70 +1302,6 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
-    }
-}
-
-struct BackgroundAudioSettingsView: View {
-    @ObservedObject var audioManager: AudioEngineManager
-    var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
-            List {
-                Section {
-                    Toggle("Background Audio", isOn: $audioManager.isBackgroundAudioEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                } header: { Text("Audio Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, audio will continue playing when you exit the app or lock your screen. If disabled, audio will stop when the app is in the background.").foregroundColor(.gray)
-                }
-                .listRowBackground(Color.white.opacity(0.1))
-                
-                if audioManager.isBackgroundAudioEnabled {
-                    Section {
-                        Toggle("Mixer Mode", isOn: $audioManager.isMixerModeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                    } footer: { Text("If enabled, audio will play simultaneously with other apps.").foregroundColor(.gray) }
-                        .listRowBackground(Color.white.opacity(0.1))
-                }
-            }.scrollContentBackground(.hidden)
-        }.navigationTitle("Background & Mixer")
-    }
-}
-
-struct RandomizerSettingsView: View {
-    @ObservedObject var audioManager: AudioEngineManager
-    var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
-            List {
-                Section {
-                    Toggle("Random Volume", isOn: $audioManager.isRandomVolumeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                } header: { Text("Volume Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, the volume will naturally fade between 70% and 130% of your set volume at random intervals (3s - 45s).").foregroundColor(.gray)
-                }
-                .listRowBackground(Color.white.opacity(0.1))
-                Section {
-                    Toggle("Random Oscillation", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                } header: { Text("Pan Options").foregroundColor(.gray) } footer: {
-                    Text("If enabled, the audio will naturally drift between left and right speakers at random intervals (3s - 45s).").foregroundColor(.gray)
-                }
-                .listRowBackground(Color.white.opacity(0.1))
-            }.scrollContentBackground(.hidden)
-        }.navigationTitle("Randomizer")
-    }
-}
-
-struct ParticleSettingsView: View {
-    @ObservedObject var audioManager: AudioEngineManager
-    var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
-            List {
-                Section {
-                    Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                } header: { Text("Visual Options").foregroundColor(.gray) } footer: {
-                    Text("These features are currently in beta. They are fully functional but still under development.").foregroundColor(.gray)
-                }
-                .listRowBackground(Color.white.opacity(0.1))
-            }.scrollContentBackground(.hidden)
-        }.navigationTitle("Beta Features")
     }
 }
 
@@ -1377,8 +1344,23 @@ class ProfileManager: ObservableObject {
         profiles.append(newProfile)
     }
     
+    // New function to overwrite an existing profile by name
+    func updateProfileByName(name: String, values: [Double], toggles: [Bool]) {
+        if let index = profiles.firstIndex(where: { $0.name == name }) {
+            let old = profiles[index]
+            profiles[index] = SoundProfile(id: old.id, name: name, bulbValues: values, bulbToggles: toggles)
+        }
+    }
+    
     func deleteProfile(at offsets: IndexSet) {
         profiles.remove(atOffsets: offsets)
+    }
+    
+    // Helper to delete by ID for manual actions
+    func deleteProfile(id: UUID) {
+        if let index = profiles.firstIndex(where: { $0.id == id }) {
+            profiles.remove(at: index)
+        }
     }
     
     func updateProfile(id: UUID, newName: String) {
@@ -1398,9 +1380,18 @@ struct ProfilesView: View {
     
     @State private var newName = ""
     @State private var isCreating = false
+    
+    // Rename States
     @State private var showRenameAlert = false
     @State private var profileToRename: SoundProfile? = nil
     @State private var renameText = ""
+    
+    // Overwrite States
+    @State private var showOverwriteAlert = false
+    
+    // Delete Confirmation States
+    @State private var showDeleteConfirmation = false
+    @State private var profileToDelete: SoundProfile? = nil
     
     var body: some View {
         NavigationView {
@@ -1408,6 +1399,63 @@ struct ProfilesView: View {
                 Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
                 
                 VStack {
+                    List {
+                        ForEach(profileManager.profiles) { profile in
+                            HStack {
+                                Text(profile.name)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Button(action: {
+                                    currentValues = profile.bulbValues
+                                    currentToggles = profile.bulbToggles
+                                    onApply()
+                                    dismiss()
+                                }) {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            .listRowBackground(Color.white.opacity(0.1))
+                            // Custom Swipe Actions
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    profileToDelete = profile
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    profileToDelete = profile
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    
                     if isCreating {
                         HStack {
                             TextField("Name", text: $newName)
@@ -1415,9 +1463,14 @@ struct ProfilesView: View {
                                 .foregroundColor(.white)
                             Button("Save") {
                                 if !newName.isEmpty {
-                                    profileManager.saveProfile(name: newName, values: currentValues, toggles: currentToggles)
-                                    newName = ""
-                                    isCreating = false
+                                    // Check if name exists
+                                    if profileManager.profiles.contains(where: { $0.name == newName }) {
+                                        showOverwriteAlert = true
+                                    } else {
+                                        profileManager.saveProfile(name: newName, values: currentValues, toggles: currentToggles)
+                                        newName = ""
+                                        isCreating = false
+                                    }
                                 }
                             }
                             .buttonStyle(.borderedProminent)
@@ -1438,46 +1491,6 @@ struct ProfilesView: View {
                         }
                         .padding()
                     }
-                    
-                    List {
-                        ForEach(profileManager.profiles) { profile in
-                            HStack {
-                                Text(profile.name)
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Button(action: {
-                                    currentValues = profile.bulbValues
-                                    currentToggles = profile.bulbToggles
-                                    onApply()
-                                    dismiss()
-                                }) {
-                                    Image(systemName: "play.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.green)
-                                }
-                            }
-                            .listRowBackground(Color.white.opacity(0.1))
-                            .contextMenu {
-                                Button {
-                                    profileToRename = profile
-                                    renameText = profile.name
-                                    showRenameAlert = true
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                
-                                Button(role: .destructive) {
-                                    if let index = profileManager.profiles.firstIndex(where: { $0.id == profile.id }) {
-                                        profileManager.deleteProfile(at: IndexSet(integer: index))
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                        .onDelete(perform: profileManager.deleteProfile)
-                    }
-                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Sound Profiles")
@@ -1486,6 +1499,7 @@ struct ProfilesView: View {
                     Button("Close") { dismiss() }.foregroundColor(.white)
                 }
             }
+            // Alert 1: Rename
             .alert("Rename Profile", isPresented: $showRenameAlert) {
                 TextField("New Name", text: $renameText)
                 Button("Save") {
@@ -1494,6 +1508,34 @@ struct ProfilesView: View {
                     }
                 }
                 Button("Cancel", role: .cancel) { }
+            }
+            // Alert 2: Overwrite
+            .alert(isPresented: $showOverwriteAlert) {
+                Alert(
+                    title: Text("Profile Already Exists"),
+                    message: Text("A profile with the name '\(newName)' already exists. Do you want to overwrite it?"),
+                    primaryButton: .destructive(Text("Overwrite")) {
+                        profileManager.updateProfileByName(name: newName, values: currentValues, toggles: currentToggles)
+                        newName = ""
+                        isCreating = false
+                    },
+                    secondaryButton: .cancel {
+                        // User cancelled overwrite; keep the text in the field so they can change it if they want
+                    }
+                )
+            }
+            // Alert 3: Delete Confirmation
+            .alert(isPresented: $showDeleteConfirmation) {
+                Alert(
+                    title: Text("Delete Profile?"),
+                    message: Text("Are you sure you want to delete '\(profileToDelete?.name ?? "this profile")'? This action cannot be undone."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        if let profile = profileToDelete {
+                            profileManager.deleteProfile(id: profile.id)
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -1601,7 +1643,7 @@ struct ContentView: View {
                 HStack(alignment: .center, spacing: 30) {
                     // 1. Random Button (Smaller)
                     Button(action: randomizeMix) {
-                        Image(systemName: "dice.fill")
+                        Image(systemName: "scribble")
                             .font(.system(size: 20))
                             .foregroundColor(.white.opacity(0.7))
                             .frame(width: 44, height: 44)
@@ -1710,9 +1752,9 @@ struct ContentView: View {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
-        // Adjusted: 1 full spin (360 deg) over 0.8 seconds. Faster but still smooth.
-        withAnimation(.easeInOut(duration: 0.8)) {
-            shuffleRotation += 360
+        // New animation: slightly rotates, stays, then comes back
+        withAnimation(.easeOut(duration: 0.25)) {
+            shuffleRotation = 15 // Rotate to 15 degrees
         }
         
         // Scale up
@@ -1720,8 +1762,12 @@ struct ContentView: View {
             isRandomizing = true
         }
         
-        // Scale down faster to match new duration
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        // Wait for a tiny bit, then return
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            withAnimation(.easeIn(duration: 0.3)) {
+                shuffleRotation = 0 // Rotate back to 0
+            }
+            
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 isRandomizing = false
             }
