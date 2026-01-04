@@ -1052,6 +1052,14 @@ struct FullScreenTimerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             VStack {
+                // Chevron indicator to dismiss (go back)
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.compact.down")
+                        .font(.system(size: 44, weight: .bold))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.top, 20)
+                }
+                
                 Spacer()
                 ZStack {
                     Circle().stroke(Color.gray.opacity(0.3), lineWidth: 15)
@@ -1069,7 +1077,7 @@ struct FullScreenTimerView: View {
                 Spacer()
                 Button(action: { showCancelConfirmation = true }) {
                     Text("Cancel").font(.title2).fontWeight(.medium).foregroundColor(.black)
-                        .frame(width: 80, height: 80).background(Color.gray).clipShape(Circle())
+                        .frame(width: 110, height: 110).background(Color.gray).clipShape(Circle())
                         .overlay(Circle().stroke(Color.black, lineWidth: 2))
                 }
                 .padding(.bottom, 50)
@@ -1418,7 +1426,7 @@ struct ProfilesView: View {
                             }
                             .listRowBackground(Color.white.opacity(0.1))
                             // Custom Swipe Actions
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                 Button {
                                     profileToRename = profile
                                     renameText = profile.name
@@ -1428,7 +1436,7 @@ struct ProfilesView: View {
                                 }
                                 .tint(.blue)
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
                                     profileToDelete = profile
                                     showDeleteConfirmation = true
@@ -1576,8 +1584,11 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            bgGradient.ignoresSafeArea()
-            
+//            bgGradient.ignoresSafeArea()
+           Image("background")
+            .resizable()
+            .scaledToFill()
+            .ignoresSafeArea()
             RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(0) && bulbToggles[0]) ? bulbValues[0] : 0.0)
                 .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
             
