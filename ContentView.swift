@@ -993,26 +993,23 @@ struct BulbSliderWithToggle: View {
                 Capsule()
                     .fill(Color.white.opacity(0.1))
                     .frame(width: trackWidth)
+                    .glassEffect(.clear)
                 
                 if isOn {
                     Capsule()
                         .fill(LinearGradient(colors: activeColors, startPoint: .bottom, endPoint: .top))
                         .frame(width: trackWidth, height: (CGFloat(value) * trackHeight) + knobDiameter + (bottomPadding * 2))
-                        .shadow(color: activeColors.first?.opacity(0.5) ?? .clear, radius: 10)
                         .animation(.spring(response: 0.3), value: value)
                 }
                 
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .shadow(color: Color.black.opacity(0.3), radius: 3, x: 0, y: 2)
-                    Image(systemName: activeIcon)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(isOn ? (iconColorOverride ?? activeColors.last) : .gray)
-                }
-                .frame(width: knobDiameter, height: knobDiameter)
-                .offset(y: -(CGFloat(value) * trackHeight)-2)
-                .padding(.bottom, bottomPadding)
+                Image(systemName: activeIcon)
+                    .font(.title2)
+                    .foregroundColor(isOn ? .primary : .secondary)
+                    .frame(width: knobDiameter, height: knobDiameter)
+                    .padding(5)
+                    .glassEffect()
+                    .offset(y: -(CGFloat(value) * trackHeight)-2)
+                    .padding(.bottom, bottomPadding)
             }
             .frame(width: width, height: height)
             .contentShape(Rectangle())
@@ -1039,7 +1036,7 @@ struct BulbSliderWithToggle: View {
                     }
             )
         }
-        .frame(width: 44, height: 180)
+        .frame(width: 40, height: 200)
     }
 }
 
@@ -1507,7 +1504,6 @@ struct ProfilesView: View {
                     Button("Close") { dismiss() }.foregroundColor(.white)
                 }
             }
-            // Alert 1: Rename
             .alert("Rename Profile", isPresented: $showRenameAlert) {
                 TextField("New Name", text: $renameText)
                 Button("Save") {
@@ -1517,7 +1513,6 @@ struct ProfilesView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             }
-            // Alert 2: Overwrite
             .alert(isPresented: $showOverwriteAlert) {
                 Alert(
                     title: Text("Profile Already Exists"),
@@ -1566,7 +1561,7 @@ struct ContentView: View {
     @State private var isRandomizing = false
     @State private var shuffleRotation = 0.0
     
-    let sliderIcons = ["cloud.rain.fill", "flame.fill", "umbrella.fill", "wind.snow", "water.waves"]
+    let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "wind.snow", "water.waves"]
     let sliderColors: [[Color]] = [
         [Color(red: 0.4, green: 0.8, blue: 1.0), Color(red: 0.0, green: 0.2, blue: 0.8)],
         [Color.orange, Color.red],
@@ -1595,22 +1590,27 @@ struct ContentView: View {
             FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(1) && bulbToggles[1]) ? bulbValues[1] : 0.0)
                 .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
             
-            VStack(spacing: 30) {
+            VStack() {
                 Button(action: { showTimerDetail = true }) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 20) {
                         ZStack {
                             Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
                             Circle().trim(from: 0, to: CGFloat(timerManager.progress)).stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 20, height: 20)
                         }.frame(width: 20, height: 20)
-                        Text(timerManager.formattedTime).font(.system(size: 24, weight: .medium)).monospacedDigit()
+                        Text(timerManager.formattedTime)
+                            .font(.title2)
+                            .monospacedDigit()
+                            .foregroundColor(.white)
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 8).background(Color.white.opacity(0.15)).clipShape(Capsule()).foregroundColor(.white)
+                    .padding(10)
+                    .padding(.horizontal, 10)
+                    .glassEffect(.clear)
                 }
-                .padding(.top, 40).opacity(timerManager.isTimerActive ? 1.0 : 0.0).disabled(!timerManager.isTimerActive).animation(.easeInOut, value: timerManager.isTimerActive)
+                .opacity(timerManager.isTimerActive ? 1.0 : 0.0).disabled(!timerManager.isTimerActive).animation(.easeInOut, value: timerManager.isTimerActive)
                 
-                Spacer(minLength: 10)
+                Spacer()
                 
-                HStack(spacing: 16) {
+                HStack(spacing: 8) {
                     ForEach(0..<5, id: \.self) { idx in
                         BulbSliderWithToggle(
                             value: $bulbValues[idx], isOn: $bulbToggles[idx],
@@ -1624,70 +1624,56 @@ struct ContentView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
                 
-                Spacer(minLength: 12)
+                Spacer()
                 
                 Button(action: {
                     if timerManager.isTimerActive { timerManager.stopTimer() }
                     audioManager.togglePlay()
                     let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
                 }) {
-                    ZStack {
-                        Circle().fill(LinearGradient(
-                            colors: (audioManager.isPlaying) ? [Color.blue.opacity(0.6), Color.purple.opacity(0.6)] : [Color.gray.opacity(0.3), Color.gray.opacity(0.1)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 120, height: 120)
-                        .shadow(color: (audioManager.isPlaying) ? .blue.opacity(0.5) : .clear, radius: 20, x: 0, y: 0)
-                        .opacity(1.0).grayscale(0.0)
-                        
-                        Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 40)).foregroundColor(.white.opacity(1.0))
-                    }
+                    
+                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.white)
+                        .padding(35)
+                        .glassEffect(.clear)
                 }
+                
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.6), value: audioManager.isPlaying)
+                .animation(.spring, value: audioManager.isPlaying)
                 
-                Spacer(minLength: 20)
+                Spacer()
                 
-                HStack(alignment: .center, spacing: 30) {
-                    // 1. Random Button (Smaller)
+                HStack(spacing: 10) {
                     Button(action: randomizeMix) {
                         Image(systemName: "scribble")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.7))
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                            .padding(15)
                             .rotationEffect(.degrees(shuffleRotation))
+                            .foregroundStyle(.white)
+                            .glassEffect(.clear)
                             .scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
                     
-                    // 2. Profiles Button (Medium)
-                    Button(action: {
-                        showProfiles = true
-                    }) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.7))
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                    Button(action: {showProfiles = true}) {
+                        Image(systemName: "waveform")
+                            .padding(15)
+                            .foregroundStyle(.white)
+                            .glassEffect(.clear)
                     }
                     
-                    // 3. Timer Button (Large/Center)
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
                         if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
                     }) {
-                        Image(systemName: "timer").font(.system(size: 26)).foregroundColor(timerManager.isTimerActive ? .orange : .white)
-                            .frame(width: 64, height: 64).background(Color.white.opacity(0.1)).clipShape(Circle())
-                            .overlay(Circle().stroke(timerManager.isTimerActive ? Color.orange : Color.white.opacity(0.3), lineWidth: timerManager.isTimerActive ? 2 : 1))
+                        Image(systemName: "timer")
+                            .font(.title)
+                            .padding(20)
+                            .foregroundStyle(.white)
+                            .glassEffect(.clear)
+
                     }
-                    .contentShape(Circle()) // Fixes the context menu preview artifact
+                    .contentShape(Circle())
                     .zIndex(1)
                     .contextMenu {
                         Button {
@@ -1707,22 +1693,23 @@ struct ContentView: View {
                         }
                     }
                     
-                    // 4. AirPlay Button (Medium)
                     AirPlayButton()
-                        .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                        .frame(width: 45, height: 45)
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .glassEffect(.clear)
                     
-                    // 5. Settings Button (Smaller)
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
                         showSettings = true
                     }) {
-                        Image(systemName: "gearshape.fill").font(.system(size: 20)).foregroundColor(.white.opacity(0.7))
-                            .frame(width: 44, height: 44).background(Color.white.opacity(0.1)).clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                        Image(systemName: "gearshape.fill")
+                            .foregroundStyle(.white)
+                            .padding(15)
+                            .glassEffect(.clear)
                     }
                 }
-                .padding(.bottom, 40).frame(maxWidth: .infinity).animation(.spring(), value: timerManager.isTimerActive)
+                .animation(.spring(), value: timerManager.isTimerActive)
             }
         }
         .onAppear {
@@ -1752,7 +1739,6 @@ struct ContentView: View {
             )
         }
         .onChange(of: isAnyBulbOn) { _, newValue in
-            // Removed auto-stop logic
         }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
             PremiumUpsellView(audioManager: audioManager)
@@ -1763,20 +1749,17 @@ struct ContentView: View {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
         
-        // New animation: slightly rotates, stays, then comes back
         withAnimation(.easeOut(duration: 0.25)) {
-            shuffleRotation = 15 // Rotate to 15 degrees
+            shuffleRotation = 15
         }
         
-        // Scale up
         withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
             isRandomizing = true
         }
         
-        // Wait for a tiny bit, then return
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(.easeIn(duration: 0.3)) {
-                shuffleRotation = 0 // Rotate back to 0
+                shuffleRotation = 0
             }
             
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
@@ -1784,7 +1767,6 @@ struct ContentView: View {
             }
         }
         
-        // Separate animation for the sliders updating, so they don't necessarily take 1.5 seconds
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
             // Reset
             for i in 0..<bulbValues.count {
