@@ -1099,7 +1099,7 @@ struct BulbSliderWithToggle: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: trackWidth)
                     .glassEffect(.clear)
-                    .padding(.bottom, bottomPadding + 2) // Added padding to hide track behind knob at bottom
+                    .padding(.bottom, bottomPadding + 2)
                 
                 if isOn {
                     Capsule()
@@ -1142,7 +1142,7 @@ struct BulbSliderWithToggle: View {
                     }
             )
         }
-        .frame(width: 40, height: 200)
+        .frame(width: 40, height: 180)
     }
 }
 
@@ -1155,7 +1155,6 @@ struct FullScreenTimerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             VStack {
-                // Chevron indicator to dismiss (go back)
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.compact.down")
                         .font(.system(size: 44, weight: .bold))
@@ -1276,19 +1275,16 @@ struct CustomTimerSheet: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
-                VStack(spacing: 30) {
-                    Text("Set Duration").font(.title3).foregroundColor(.white.opacity(0.7)).padding(.top, 20)
-                    HStack(spacing: 0) {
-                        Picker("Hours", selection: $selectedHours) { ForEach(0..<24) { i in Text("\(i) h").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
-                        Picker("Minutes", selection: $selectedMinutes) { ForEach(0..<60) { i in Text("\(i) m").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
-                        Picker("Seconds", selection: $selectedSeconds) { ForEach(0..<60) { i in Text("\(i) s").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
-                    }
-                    .colorScheme(.dark).padding()
-                    Spacer()
+            VStack(spacing: 30) {
+                Text("Set Duration").font(.title3).foregroundColor(.white.opacity(0.7)).padding(.top, 20)
+                HStack(spacing: 0) {
+                    Picker("Hours", selection: $selectedHours) { ForEach(0..<24) { i in Text("\(i) h").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
+                    Picker("Minutes", selection: $selectedMinutes) { ForEach(0..<60) { i in Text("\(i) m").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
+                    Picker("Seconds", selection: $selectedSeconds) { ForEach(0..<60) { i in Text("\(i) s").tag(i).foregroundColor(.white) } }.pickerStyle(.wheel).frame(width: 70).clipped()
                 }
-            }
+                .colorScheme(.dark).padding()
+                Spacer()
+                }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.foregroundColor(.white) }
@@ -1315,7 +1311,6 @@ struct SettingsView: View {
             ZStack {
                 Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
                 List {
-                    // Membership Status Section
                     Section {
                         if PurchaseManager.shared.isPremium {
                             Menu {
@@ -1345,7 +1340,6 @@ struct SettingsView: View {
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                     
-                    // Background Audio Section
                     Section {
                         Toggle("Background Audio", isOn: $audioManager.isBackgroundAudioEnabled)
                             .toggleStyle(SwitchToggleStyle(tint: .green))
@@ -1367,7 +1361,6 @@ struct SettingsView: View {
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                     
-                    // Randomizer Section
                     Section {
                         Toggle("Random Volume", isOn: $audioManager.isRandomVolumeEnabled)
                             .toggleStyle(SwitchToggleStyle(tint: .green))
@@ -1382,7 +1375,6 @@ struct SettingsView: View {
                     }
                     .listRowBackground(Color.white.opacity(0.1))
                     
-                    // Beta Features Section
                     Section {
                         Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled)
                             .toggleStyle(SwitchToggleStyle(tint: .green))
@@ -1505,84 +1497,79 @@ struct ProfilesView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea()
-                
-                VStack {
-                    if profileManager.profiles.isEmpty {
-                        VStack(spacing: 15) {
-                            Image(systemName: "music.note.list")
-                                .font(.system(size: 40))
-                                .foregroundColor(.gray.opacity(0.5))
-                            Text("No saved profiles")
-                                .font(.headline)
-                                .foregroundColor(.gray.opacity(0.5))
-                            Text("Tap the + button on the main screen to save your current mix.")
-                                .font(.caption)
-                                .foregroundColor(.gray.opacity(0.4))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
-                        .padding(.top, 50)
-                        Spacer()
-                    } else {
-                        List {
-                            ForEach(profileManager.profiles) { profile in
-                                HStack {
-                                    Text(profile.name)
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    Button(action: {
-                                        currentValues = profile.bulbValues
-                                        currentToggles = profile.bulbToggles
-                                        onApply()
-                                        dismiss()
-                                    }) {
-                                        Image(systemName: "play.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.green)
-                                    }
+            VStack {
+                if profileManager.profiles.isEmpty {
+                    VStack(spacing: 15) {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("No saved profiles")
+                            .font(.headline)
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("Tap the + button on the main screen to save your current mix.")
+                            .font(.caption)
+                            .foregroundColor(.gray.opacity(0.4))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top, 50)
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(profileManager.profiles) { profile in
+                            HStack {
+                                Text(profile.name)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Button(action: {
+                                    currentValues = profile.bulbValues
+                                    currentToggles = profile.bulbToggles
+                                    onApply()
+                                    dismiss()
+                                }) {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.green)
                                 }
-                                .listRowBackground(Color.white.opacity(0.1))
-                                // Custom Swipe Actions
-                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button {
-                                        profileToRename = profile
-                                        renameText = profile.name
-                                        showRenameAlert = true
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(.blue)
+                            }
+                            .listRowBackground(Color.white.opacity(0.1))
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
                                 }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        profileToDelete = profile
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    profileToDelete = profile
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
-                                .contextMenu {
-                                    Button {
-                                        profileToRename = profile
-                                        renameText = profile.name
-                                        showRenameAlert = true
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
-                                    
-                                    Button(role: .destructive) {
-                                        profileToDelete = profile
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                            }
+                            .contextMenu {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    profileToDelete = profile
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                        .scrollContentBackground(.hidden)
                     }
+                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Sound Profiles")
@@ -1600,7 +1587,6 @@ struct ProfilesView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             }
-            // Alert 3: Delete Confirmation
             .alert(isPresented: $showDeleteConfirmation) {
                 Alert(
                     title: Text("Delete Profile?"),
@@ -1633,7 +1619,6 @@ struct ContentView: View {
     @State private var showOverwriteAlert = false
     @State private var tempProfileName = ""
     
-    // New States for Profile Button Management
     @State private var profileToRename: SoundProfile? = nil
     @State private var showRenameAlert = false
     @State private var renameText = ""
@@ -1668,20 +1653,17 @@ struct ContentView: View {
     
     var isAnyBulbOn: Bool { bulbToggles.contains(true) }
     
-    let bgGradient = LinearGradient(
-        gradient: Gradient(colors: [Color(red: 0.1, green: 0.1, blue: 0.2), Color(red: 0.05, green: 0.05, blue: 0.1)]),
-        startPoint: .topLeading, endPoint: .bottomTrailing
-    )
-    
     var body: some View {
         ZStack {
             ZStack {
-//                bgGradient.ignoresSafeArea()
                Image("background")
                 .resizable()
                 .scaledToFill()
-//                .blur(radius: 20)
                 .ignoresSafeArea()
+                .blur(radius: 10)
+                .onTapGesture {
+                    withAnimation { showProfiles = false }
+                }
                 
                 RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(0) && bulbToggles[0]) ? bulbValues[0] : 0.0)
                     .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
@@ -1715,7 +1697,7 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .animation(.spring(), value: timerManager.isTimerActive)
-                    
+                
                 Spacer()
                 
                 HStack(spacing: 8) {
@@ -1734,131 +1716,20 @@ struct ContentView: View {
                 }
                 
                 Button(action: {
-                    withAnimation {
-                        showProfiles.toggle()
-                    }
-                }) {
-                    Text(currentProfileButtonText)
+                    withAnimation { showProfiles.toggle() }
+                }) {Text(currentProfileButtonText)
                         .font(.caption).bold()
                         .foregroundColor(.white)
                         .textCase(.uppercase)
                         .tracking(2)
-//                        .padding(.top, 5)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .glassEffect(.clear)
-                        .padding(.top, 20)
+                        .padding(.top, 5)
+                    //                        .padding(.horizontal, 20)
+                    //                        .padding(.vertical, 10)
+                    //                        .glassEffect(.clear)
+                    //                        .padding(.top, 20)
                 }
                 
-                Spacer()
-                
-                Button(action: {
-                    let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-                    
-                    if audioManager.isPlaying {
-                        audioManager.stop()
-                        if timerManager.isTimerActive {
-                            timerManager.pauseTimer()
-                        }
-                    } else {
-                        audioManager.play()
-                        if timerManager.isTimerActive && timerManager.isPaused {
-                            timerManager.resumeTimer()
-                        }
-                    }
-                }) {
-                    
-                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.white)
-                        .padding(35)
-                        .glassEffect(.clear)
-                }
-                .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
-                .animation(.spring, value: audioManager.isPlaying)
-                
-                Spacer()
-                
-                HStack(spacing: 10) {
-                    Button(action: randomizeMix) {
-                        Image(systemName: "scribble")
-                            .padding(15)
-                            .rotationEffect(.degrees(shuffleRotation))
-                            .foregroundStyle(.white)
-                            .glassEffect(.clear)
-                            .scaleEffect(isRandomizing ? 1.5 : 1.0)
-                    }
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                        showSaveProfileOverlay = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                            .padding(15)
-                            .foregroundStyle(.white)
-                            .glassEffect(.clear)
-                    }
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                        if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
-                    }) {
-                        Image(systemName: "timer")
-                            .font(.title)
-                            .padding(20)
-                            .foregroundStyle(.white)
-                            .glassEffect(.clear)
-
-                    }
-                    .contentShape(Circle())
-                    .zIndex(1)
-                    .contextMenu {
-                        Button {
-                            timerManager.startTimer(duration: 15 * 60)
-                        } label: {
-                            Text("15 Minutes")
-                        }
-                        Button {
-                            timerManager.startTimer(duration: 30 * 60)
-                        } label: {
-                            Text("30 Minutes")
-                        }
-                        Button {
-                            timerManager.startTimer(duration: 60 * 60)
-                        } label: {
-                            Text("60 Minutes")
-                        }
-                    }
-                    
-                    AirPlayButton()
-                        .frame(width: 45, height: 45)
-                        .foregroundStyle(.white)
-                        .padding(4)
-                        .glassEffect(.clear)
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                        showSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundStyle(.white)
-                            .padding(15)
-                            .glassEffect(.clear)
-                    }
-                }
-                .animation(.spring(), value: timerManager.isTimerActive)
-            }
-            .offset(y: 20)
-            
-            if showProfiles {
-                ZStack {
-                    Color.black.opacity(0.001)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation { showProfiles = false }
-                        }
-                    
+                if showProfiles {
                     VStack (spacing: 0) {
                         if profileManager.profiles.isEmpty {
                             Text("No saved profiles")
@@ -1867,7 +1738,6 @@ struct ContentView: View {
                                 .padding(.vertical, 10)
                                 .padding(.horizontal, 20)
                                 .glassEffect(.clear)
-                                .transition(.move(edge: .top).combined(with: .opacity))
                         } else {
                             ScrollView(.vertical, showsIndicators: false) {
                                 VStack(spacing: 10) {
@@ -1881,13 +1751,15 @@ struct ContentView: View {
                                             let impact = UIImpactFeedbackGenerator(style: .light)
                                             impact.impactOccurred()
                                             withAnimation { showProfiles = false }
-                                        }) {
-                                            Text(profile.name)
+                                        }) { Text(profile.name)
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
                                                 .foregroundColor(.white)
-                                                .frame(width: 100)
-                                                .padding(.vertical, 10)
+                                                .frame(width: 150)
+                                                .padding(.vertical, 5)
                                                 .glassEffect(.clear)
                                         }
+                                        .padding(40)
                                         .contextMenu {
                                             Button {
                                                 profileManager.updateProfileSettings(id: profile.id, values: bulbValues, toggles: bulbToggles)
@@ -1914,16 +1786,116 @@ struct ContentView: View {
                                         }
                                     }
                                 }
-                                .padding(.vertical, 5)
                             }
-                            .frame(maxHeight: 300)
-                            .transition(.move(edge: .top).combined(with: .opacity))
                         }
-                        Spacer()
                     }
+                    .frame(maxHeight: .infinity)
+                    Spacer()
                 }
-                .zIndex(2)
+                
+                
+                if !showProfiles{
+                    Spacer()
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
+                        
+                        if audioManager.isPlaying {
+                            audioManager.stop()
+                            if timerManager.isTimerActive {
+                                timerManager.pauseTimer()
+                            }
+                        } else {
+                            audioManager.play()
+                            if timerManager.isTimerActive && timerManager.isPaused {
+                                timerManager.resumeTimer()
+                            }
+                        }
+                    }) {
+                        
+                        Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.largeTitle)
+                            .foregroundStyle(.white)
+                            .padding(35)
+                            .glassEffect(.clear)
+                    }
+                    .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
+                    .animation(.spring, value: audioManager.isPlaying)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 10) {
+                        Button(action: randomizeMix) {
+                            Image(systemName: "scribble")
+                                .padding(15)
+                                .rotationEffect(.degrees(shuffleRotation))
+                                .foregroundStyle(.white)
+                                .glassEffect(.clear)
+                                .scaleEffect(isRandomizing ? 1.5 : 1.0)
+                        }
+                        
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                            withAnimation{
+                                showSaveProfileOverlay = true
+                            }
+                        }) { Image(systemName: "plus")
+                                .font(.title2)
+                                .padding(15)
+                                .foregroundStyle(.white)
+                                .glassEffect(.clear)
+                        }
+                        
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                            if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
+                        }) {
+                            Image(systemName: "timer")
+                                .font(.title)
+                                .padding(20)
+                                .foregroundStyle(.white)
+                                .glassEffect(.clear)
+                            
+                        }
+                        .contentShape(Circle())
+                        .zIndex(1)
+                        .contextMenu {
+                            Button {
+                                timerManager.startTimer(duration: 15 * 60)
+                            } label: {
+                                Text("15 Minutes")
+                            }
+                            Button {
+                                timerManager.startTimer(duration: 30 * 60)
+                            } label: {
+                                Text("30 Minutes")
+                            }
+                            Button {
+                                timerManager.startTimer(duration: 60 * 60)
+                            } label: {
+                                Text("60 Minutes")
+                            }
+                        }
+                        
+                        AirPlayButton()
+                            .frame(width: 45, height: 45)
+                            .foregroundStyle(.white)
+                            .padding(4)
+                            .glassEffect(.clear)
+                        
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                            showSettings = true
+                        }) {
+                            Image(systemName: "gearshape.fill")
+                                .foregroundStyle(.white)
+                                .padding(15)
+                                .glassEffect(.clear)
+                        }
+                    }
+                    .animation(.spring(), value: timerManager.isTimerActive)
+                }
             }
+            .offset(y: 20)
             
             if showSaveProfileOverlay {
                 SaveProfileOverlay(isPresented: $showSaveProfileOverlay) { name in
@@ -1934,8 +1906,6 @@ struct ContentView: View {
                         profileManager.saveProfile(name: name, values: bulbValues, toggles: bulbToggles)
                     }
                 }
-                .zIndex(100)
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
         .onAppear {
