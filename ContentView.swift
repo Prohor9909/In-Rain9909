@@ -1099,6 +1099,7 @@ struct BulbSliderWithToggle: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: trackWidth)
                     .glassEffect(.clear)
+                    .padding(.bottom, bottomPadding + 2) // Added padding to hide track behind knob at bottom
                 
                 if isOn {
                     Capsule()
@@ -1454,7 +1455,6 @@ class ProfileManager: ObservableObject {
         profiles.append(newProfile)
     }
     
-    // New function to overwrite an existing profile by name
     func updateProfileByName(name: String, values: [Double], toggles: [Bool]) {
         if let index = profiles.firstIndex(where: { $0.name == name }) {
             let old = profiles[index]
@@ -1462,11 +1462,17 @@ class ProfileManager: ObservableObject {
         }
     }
     
+    func updateProfileSettings(id: UUID, values: [Double], toggles: [Bool]) {
+        if let index = profiles.firstIndex(where: { $0.id == id }) {
+            let old = profiles[index]
+            profiles[index] = SoundProfile(id: old.id, name: old.name, bulbValues: values, bulbToggles: toggles)
+        }
+    }
+    
     func deleteProfile(at offsets: IndexSet) {
         profiles.remove(atOffsets: offsets)
     }
     
-    // Helper to delete by ID for manual actions
     func deleteProfile(id: UUID) {
         if let index = profiles.firstIndex(where: { $0.id == id }) {
             profiles.remove(at: index)
@@ -1627,12 +1633,31 @@ struct ContentView: View {
     @State private var showOverwriteAlert = false
     @State private var tempProfileName = ""
     
+    // New States for Profile Button Management
+    @State private var profileToRename: SoundProfile? = nil
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
+    
+    @State private var profileToDelete: SoundProfile? = nil
+    @State private var showDeleteConfirmation = false
+    
     @State private var bulbValues: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
     @State private var bulbToggles: [Bool] = [false, false, false, false, false]
     @State private var isRandomizing = false
     @State private var shuffleRotation = 0.0
     
-    let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "wind.snow", "water.waves"]
+    private var currentProfileButtonText: String {
+        if let match = profileManager.profiles.first(where: { $0.bulbValues == bulbValues && $0.bulbToggles == bulbToggles }) {
+            let name = match.name
+            if name.count > 15 {
+                return String(name.prefix(15)) + "..."
+            }
+            return name
+        }
+        return "Profiles"
+    }
+    
+    let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "bolt.fill", "waveform"]
     let sliderColors: [[Color]] = [
         [Color(red: 0.4, green: 0.8, blue: 1.0), Color(red: 0.0, green: 0.2, blue: 0.8)],
         [Color.orange, Color.red],
@@ -1650,14 +1675,12 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // LAYER 1: Background and Effects (IGNORES KEYBOARD)
-            // Grouping these into a ZStack that explicitly ignores the keyboard safe area
-            // prevents the background from resizing/shifting when the keyboard appears.
             ZStack {
 //                bgGradient.ignoresSafeArea()
                Image("background")
                 .resizable()
                 .scaledToFill()
+//                .blur(radius: 20)
                 .ignoresSafeArea()
                 
                 RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(0) && bulbToggles[0]) ? bulbValues[0] : 0.0)
@@ -1668,34 +1691,10 @@ struct ContentView: View {
             }
             .ignoresSafeArea(.keyboard)
             
-            // LAYER 2: Main Content (Adaptive)
-            // This layer respects the keyboard safe area so buttons move up if needed.
-            VStack() {
-                // MARK: - Top Section (Status)
-                VStack(spacing: 15) {
-                    // 1. Profiles Button (Always Visible, centered)
-                    Button(action: { showProfiles = true }) {
-                        HStack(spacing: 15) {
-                            ZStack {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                                    .frame(width: 20, height: 20)
-                                Image(systemName: "list.bullet")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                            Text("Profiles")
-                                .font(.title2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                        }
-                        .padding(10)
-                        .padding(.horizontal, 10)
-                        .glassEffect(.clear)
-                    }
-                    
-                    // 2. Timer Display (Visible only when active)
-                    if timerManager.isTimerActive {
+
+            VStack {
+                VStack {
+                    if timerManager.isTimerActive && !showProfiles {
                         Button(action: { showTimerDetail = true }) {
                             HStack(spacing: 20) {
                                 ZStack {
@@ -1714,10 +1713,9 @@ struct ContentView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
-                .frame(maxWidth: .infinity) // Center align horizontally
-                .padding(.top, 50) // Adjust for safe area
+                .frame(maxWidth: .infinity)
                 .animation(.spring(), value: timerManager.isTimerActive)
-                
+                    
                 Spacer()
                 
                 HStack(spacing: 8) {
@@ -1735,23 +1733,35 @@ struct ContentView: View {
                     }
                 }
                 
+                Button(action: {
+                    withAnimation {
+                        showProfiles.toggle()
+                    }
+                }) {
+                    Text(currentProfileButtonText)
+                        .font(.caption).bold()
+                        .foregroundColor(.white)
+                        .textCase(.uppercase)
+                        .tracking(2)
+//                        .padding(.top, 5)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .glassEffect(.clear)
+                        .padding(.top, 20)
+                }
+                
                 Spacer()
                 
-                // MARK: - Play/Pause Button
                 Button(action: {
                     let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
                     
                     if audioManager.isPlaying {
-                        // Pause Audio
                         audioManager.stop()
-                        // Pause Timer if active
                         if timerManager.isTimerActive {
                             timerManager.pauseTimer()
                         }
                     } else {
-                        // Play Audio
                         audioManager.play()
-                        // Resume Timer if it was active and paused
                         if timerManager.isTimerActive && timerManager.isPaused {
                             timerManager.resumeTimer()
                         }
@@ -1764,7 +1774,6 @@ struct ContentView: View {
                         .padding(35)
                         .glassEffect(.clear)
                 }
-                
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0)
                 .animation(.spring, value: audioManager.isPlaying)
                 
@@ -1780,7 +1789,6 @@ struct ContentView: View {
                             .scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
                     
-                    // MARK: - Save Button (Replaces Profiles Button in toolbar)
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
                         showSaveProfileOverlay = true
@@ -1841,8 +1849,82 @@ struct ContentView: View {
                 }
                 .animation(.spring(), value: timerManager.isTimerActive)
             }
+            .offset(y: 20)
             
-            // MARK: - Custom Input Overlay
+            if showProfiles {
+                ZStack {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation { showProfiles = false }
+                        }
+                    
+                    VStack (spacing: 0) {
+                        if profileManager.profiles.isEmpty {
+                            Text("No saved profiles")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 20)
+                                .glassEffect(.clear)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        } else {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                VStack(spacing: 10) {
+                                    ForEach(profileManager.profiles) { profile in
+                                        Button(action: {
+                                            bulbValues = profile.bulbValues
+                                            bulbToggles = profile.bulbToggles
+                                            for idx in 0..<bulbValues.count {
+                                                updateVolume(for: idx)
+                                            }
+                                            let impact = UIImpactFeedbackGenerator(style: .light)
+                                            impact.impactOccurred()
+                                            withAnimation { showProfiles = false }
+                                        }) {
+                                            Text(profile.name)
+                                                .foregroundColor(.white)
+                                                .frame(width: 100)
+                                                .padding(.vertical, 10)
+                                                .glassEffect(.clear)
+                                        }
+                                        .contextMenu {
+                                            Button {
+                                                profileManager.updateProfileSettings(id: profile.id, values: bulbValues, toggles: bulbToggles)
+                                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                                impact.impactOccurred()
+                                            } label: {
+                                                Label("Overwrite", systemImage: "arrow.triangle.2.circlepath")
+                                            }
+                                            
+                                            Button {
+                                                profileToRename = profile
+                                                renameText = profile.name
+                                                showRenameAlert = true
+                                            } label: {
+                                                Label("Rename", systemImage: "pencil")
+                                            }
+                                            
+                                            Button(role: .destructive) {
+                                                profileToDelete = profile
+                                                showDeleteConfirmation = true
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 5)
+                            }
+                            .frame(maxHeight: 300)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        Spacer()
+                    }
+                }
+                .zIndex(2)
+            }
+            
             if showSaveProfileOverlay {
                 SaveProfileOverlay(isPresented: $showSaveProfileOverlay) { name in
                     if profileManager.profiles.contains(where: { $0.name == name }) {
@@ -1863,18 +1945,6 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showCustomTimerSheet) { CustomTimerSheet(timerManager: timerManager, audioManager: audioManager) }
         .sheet(isPresented: $showTimerDetail) { FullScreenTimerView(timerManager: timerManager) }
-        .sheet(isPresented: $showProfiles) {
-            ProfilesView(
-                profileManager: profileManager,
-                currentValues: $bulbValues,
-                currentToggles: $bulbToggles,
-                onApply: {
-                    for i in 0..<bulbValues.count {
-                        updateVolume(for: i)
-                    }
-                }
-            )
-        }
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
         .alert(isPresented: $showStopConfirmation) {
             Alert(
@@ -1882,18 +1952,38 @@ struct ContentView: View {
                 primaryButton: .destructive(Text("Cancel Timer")) { timerManager.stopTimer() }, secondaryButton: .cancel()
             )
         }
-        // Overwrite Alert for the Save Overlay
         .alert(isPresented: $showOverwriteAlert) {
             Alert(
                 title: Text("Profile Exists"),
                 message: Text("Overwrite existing profile '\(tempProfileName)'?"),
                 primaryButton: .destructive(Text("Overwrite")) {
                     profileManager.updateProfileByName(name: tempProfileName, values: bulbValues, toggles: bulbToggles)
-                    showSaveProfileOverlay = false // Force close overlay if it was still open logic-wise, though we handle it
+                    showSaveProfileOverlay = false
                 },
                 secondaryButton: .cancel {
-                    showSaveProfileOverlay = true // Re-show overlay to let them rename
+                    showSaveProfileOverlay = true
                 }
+            )
+        }
+        .alert("Rename Profile", isPresented: $showRenameAlert) {
+            TextField("New Name", text: $renameText)
+            Button("Save") {
+                if let profile = profileToRename {
+                    profileManager.updateProfile(id: profile.id, newName: renameText)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .alert(isPresented: $showDeleteConfirmation) {
+            Alert(
+                title: Text("Delete Profile?"),
+                message: Text("Are you sure you want to delete '\(profileToDelete?.name ?? "this profile")'? This action cannot be undone."),
+                primaryButton: .destructive(Text("Delete")) {
+                    if let profile = profileToDelete {
+                        profileManager.deleteProfile(id: profile.id)
+                    }
+                },
+                secondaryButton: .cancel()
             )
         }
         .onChange(of: isAnyBulbOn) { _, newValue in
@@ -1901,6 +1991,7 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
             PremiumUpsellView(audioManager: audioManager)
         }
+        .statusBarHidden(true)
     }
     
     private func randomizeMix() {
@@ -1926,13 +2017,11 @@ struct ContentView: View {
         }
         
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-            // Reset
             for i in 0..<bulbValues.count {
                 bulbValues[i] = 0.0
                 bulbToggles[i] = false
             }
             
-            // Randomize 1 to 4 active sounds
             let count = Int.random(in: 1...4)
             let indices = Array(0..<bulbValues.count).shuffled().prefix(count)
             
@@ -1942,7 +2031,6 @@ struct ContentView: View {
             }
         }
         
-        // Update audio
         for i in 0..<bulbValues.count {
             updateVolume(for: i)
         }
