@@ -399,10 +399,9 @@ struct ContentView: View {
             }
         }
         withAnimation {
-            for i in 0..<bulbValues.count { bulbValues[i] = 0.0 }
-            let count = Int.random(in: 1...4)
-            let indices = Array(0..<bulbValues.count).shuffled().prefix(count)
-            for idx in indices { bulbValues[idx] = Double.random(in: 0.3...0.9) }
+            for i in 0..<bulbValues.count {
+                bulbValues[i] = Double.random(in: 0...1)
+            }
         }
         for i in 0..<bulbValues.count { updateVolume(for: i) }
     }

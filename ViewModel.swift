@@ -56,7 +56,6 @@ class TimerManager: ObservableObject {
         }
     }
     
-    
     private func timerFinished() { stopTimer(); audioManager?.stop() }
     var progress: Double { guard totalDuration > 0 else { return 0 }; return timeRemaining / totalDuration }
     var formattedTime: String {
@@ -184,9 +183,9 @@ class AudioEngineManager: ObservableObject {
     init() {
         self.isBackgroundAudioEnabled = UserDefaults.standard.object(forKey: "isBackgroundAudioEnabled") as? Bool ?? true
         self.isMixerModeEnabled = UserDefaults.standard.object(forKey: "isMixerModeEnabled") as? Bool ?? false
-        self.isRandomVolumeEnabled = UserDefaults.standard.bool(forKey: "isRandomVolumeEnabled")
-        self.isRandomOscillationEnabled = UserDefaults.standard.bool(forKey: "isRandomOscillationEnabled")
-        self.isParticleEffectsEnabled = UserDefaults.standard.bool(forKey: "isParticleEffectsEnabled")
+        self.isRandomVolumeEnabled = UserDefaults.standard.object(forKey: "isRandomVolumeEnabled") as? Bool ?? true
+        self.isRandomOscillationEnabled = UserDefaults.standard.object(forKey: "isRandomOscillationEnabled") as? Bool ?? true
+        self.isParticleEffectsEnabled = UserDefaults.standard.object(forKey: "isParticleEffectsEnabled") as? Bool ?? true
         individualVolumes = Array(repeating: 0.5, count: fileNames.count)
         configureAudioSession(); setupTracks(); setupInterruptionObserver(); setupRemoteTransportControls(); setupLifecycleObservers()
     }
@@ -236,8 +235,8 @@ class AudioEngineManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 3...45) * 1_000_000_000))
                 if Task.isCancelled { break }
-                let tgt = Float.random(in: 0.7...1.3), dur = Double.random(in: 2.0...4.0)
-                await MainActor.run { for track in tracks { if track.fileName == "fireplace" { continue }; track.fadeRandomVolume(to: tgt, duration: dur) } }
+                let tgt = Float.random(in: 0.6...1.0), dur = Double.random(in: 5.0...15.0)
+                await MainActor.run { for track in tracks { if track.fileName == "Fireplace" { continue }; track.fadeRandomVolume(to: tgt, duration: dur) } }
             }
         }
     }
@@ -246,8 +245,22 @@ class AudioEngineManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 3...45) * 1_000_000_000))
                 if Task.isCancelled { break }
-                let tgt = Float.random(in: -0.7...0.7), dur = Double.random(in: 2.0...5.0)
-                await MainActor.run { for track in tracks { if track.fileName == "fireplace" { continue }; track.fadePan(to: tgt, duration: dur) } }
+                let tgt = Float.random(in: -0.7...0.7), dur = Double.random(in: 10.0...20.0)
+                await MainActor.run {
+                    for track in tracks {
+                        if track.fileName == "Fireplace" { continue }
+                        let finalTgt = tgt
+                        let finalDur = dur
+                        if track.fileName == "Thunder" {
+                            Task {
+                                try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 0...10) * 1_000_000_000))
+                                await MainActor.run { track.fadePan(to: finalTgt, duration: finalDur) }
+                            }
+                        } else {
+                            track.fadePan(to: finalTgt, duration: finalDur)
+                        }
+                    }
+                }
             }
         }
     }

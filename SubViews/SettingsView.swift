@@ -40,7 +40,7 @@ struct SettingsView: View {
                     Toggle("Spatial Polarization", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 }.listRowBackground(Color.white.opacity(0.1))
                 Section(header: Text("Beta Features").foregroundColor(.gray), footer: Text("These features are currently in beta.").foregroundColor(.gray)) {
-                    Toggle("Particle Effects", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                    Toggle("Visuals", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 }.listRowBackground(Color.white.opacity(0.1))
             }
             .scrollContentBackground(.hidden)
