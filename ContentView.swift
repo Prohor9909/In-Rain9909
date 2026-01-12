@@ -5,7 +5,7 @@ struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
         picker.backgroundColor = .clear;
-        picker.activeTintColor = .systemMint;
+        picker.activeTintColor = .orange;
         picker.tintColor = .white.withAlphaComponent(0.7)
         return picker
     }
@@ -104,12 +104,12 @@ struct ContentView: View {
                     }
                 
                 RumbleEffectView(
-                    intensity: bulbValues[4],
+                    intensity: audioManager.isPlaying ? bulbValues[4] : 0,
                     isEnabled: audioManager.isParticleEffectsEnabled
                 )
                 
                 LightningEffectView(
-                    intensity: bulbValues[3],
+                    intensity: audioManager.isPlaying ? bulbValues[3] : 0,
                     triggerFlash: audioManager.triggerFlash,
                     isEnabled: audioManager.isParticleEffectsEnabled
                 )
@@ -275,10 +275,10 @@ struct ContentView: View {
                             audioManager.isRandomOscillationEnabled.toggle()
                         }
                     }) {
-                        Image(systemName: "waveform")
+                        Image(systemName: "aqi.medium")
                             .font(.title2)
                             .frame(width: 45, height: 45)
-                            .foregroundStyle((audioManager.isRandomVolumeEnabled && audioManager.isRandomOscillationEnabled) ? .green : .white)
+                            .foregroundStyle((audioManager.isRandomVolumeEnabled && audioManager.isRandomOscillationEnabled) ? .orange : .white)
                             .glassEffect(.clear)
                     }
                     Button(action: {
@@ -320,10 +320,6 @@ struct ContentView: View {
                 }
                 .animation(.spring(), value: timerManager.isTimerActive)
             }
-
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-
-//            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             timerManager.setAudioManager(audioManager)
