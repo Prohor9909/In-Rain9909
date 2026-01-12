@@ -314,25 +314,21 @@ struct ContentView: View {
         .sheet(isPresented: $showCustomTimerSheet) { TimerView(timerManager: timerManager, audioManager: audioManager) }
         .sheet(isPresented: $showTimerDetail) { CountDownView(timerManager: timerManager) }
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
-        .alert(isPresented: $showOverwriteAlert) {
-            Alert(title: Text("Profile Exists"), message: Text("Overwrite existing profile '\(tempProfileName)'?"), primaryButton: .destructive(Text("Overwrite")) { profileManager.updateProfileByName(name: tempProfileName, values: bulbValues); showSaveProfileOverlay = false }, secondaryButton: .cancel { showSaveProfileOverlay = true })
-        }
-        .alert("Rename Profile", isPresented: $showRenameAlert) {
-            TextField("New Name", text: $renameText)
-            Button("Save") { if let profile = profileToRename { profileManager.updateProfile(id: profile.id, newName: renameText) } }
-            Button("Cancel", role: .cancel) { }
-        }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
         .statusBarHidden(true)
     }
     
     private func animateProfileOverwrite(at index: Int) {
-        withAnimation(.easeOut(duration: 0.25)) { profileRotations[index] = 15 }
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) { overRotating[index] = true }
+        withAnimation {
+            profileRotations[index] = 15
+            overRotating[index] = true
+        }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation(.easeIn(duration: 0.3)) { profileRotations[index] = 0 }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) { overRotating[index] = false }
+            withAnimation {
+                profileRotations[index] = 0
+                overRotating[index] = false
+            }
         }
     }
     
@@ -346,13 +342,13 @@ struct ContentView: View {
     
     private func randomizeMix() {
         let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-        withAnimation(.easeOut(duration: 0.25)) { shuffleRotation = 15 }
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) { isRandomizing = true }
+        withAnimation { shuffleRotation = 15 }
+        withAnimation { isRandomizing = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation(.easeIn(duration: 0.3)) { shuffleRotation = 0 }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) { isRandomizing = false }
+            withAnimation { shuffleRotation = 0 }
+            withAnimation { isRandomizing = false }
         }
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+        withAnimation {
             for i in 0..<bulbValues.count { bulbValues[i] = 0.0 }
             let count = Int.random(in: 1...4)
             let indices = Array(0..<bulbValues.count).shuffled().prefix(count)
