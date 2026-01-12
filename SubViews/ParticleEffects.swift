@@ -1,4 +1,47 @@
 import SwiftUI
+
+struct LightningEffectView: View {
+    var intensity: Double
+    var triggerFlash: Bool
+    var isEnabled: Bool
+    
+    @State private var flashMultiplier = 0.0
+    
+    var body: some View {
+        RadialGradient(
+            colors: [.white.opacity(0.8), .clear],
+            center: .top,
+            startRadius: 0,
+            endRadius: 600
+        )
+            .ignoresSafeArea()
+            .opacity(isEnabled ? flashMultiplier * intensity * 0.5 : 0)
+            .allowsHitTesting(false)
+            .task(id: triggerFlash) {
+                guard isEnabled && intensity > 0 else { return }
+                
+                try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
+                
+                withAnimation(.bouncy(duration: 0.4)) { flashMultiplier = 1.0 }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                withAnimation(.easeOut(duration: 0.4)) { flashMultiplier = 0.0 }
+                
+                while !Task.isCancelled {
+                    let interval = Double.random(in: 1.0...5.0)
+                    try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    
+                    let loopIntensity = Double.random(in: 0.4...0.7)
+                    withAnimation(.bouncy(duration: 0.2)) { flashMultiplier = loopIntensity }
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    withAnimation(.easeOut(duration: 0.2)) { flashMultiplier = 0.0 }
+                }
+            }
+            .onChange(of: isEnabled) {
+                if !isEnabled { flashMultiplier = 0.0 }
+            }
+    }
+}
+
 struct RainParticle: Identifiable { let id = UUID(); var x: CGFloat; var y: CGFloat; var speed: Double; var opacity: Double; var scale: Double; var length: CGFloat }
 struct RainEffectView: View {
     var intensity: Double

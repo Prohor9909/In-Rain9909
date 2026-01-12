@@ -102,6 +102,13 @@ struct ContentView: View {
                             }
 
                     }
+                
+                LightningEffectView(
+                    intensity: bulbValues[3],
+                    triggerFlash: audioManager.triggerFlash,
+                    isEnabled: audioManager.isParticleEffectsEnabled
+                )
+                
                 RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0, windAngle: bulbValues[2])
                     .edgesIgnoringSafeArea(.all)
                     .allowsHitTesting(false)

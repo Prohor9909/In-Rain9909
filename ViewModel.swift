@@ -72,6 +72,7 @@ class SoundTrack: NSObject {
     private var activePlayerIndex = 0
     var individualVolume: Float = 0.5, masterVolume: Float = 1.0, randomVolumeMultiplier: Float = 1.0
     var fileName: String
+    var onLoop: (() -> Void)?
     private var crossfadeTimer: Timer?
     private let crossfadeDuration: TimeInterval = 2.5
     private var isPlaying: Bool = false
@@ -98,6 +99,7 @@ class SoundTrack: NSObject {
             p.currentTime = 0; p.volume = 0; p.play()
             p.setVolume(currentVolume, fadeDuration: 1.0)
             scheduleCrossfade(for: p)
+            onLoop?()
         }
     }
     func pause() {
@@ -149,6 +151,7 @@ class SoundTrack: NSObject {
         outgoingPlayer.setVolume(0, fadeDuration: crossfadeDuration)
         activePlayerIndex = nextIndex
         scheduleCrossfade(for: incomingPlayer)
+        onLoop?()
         DispatchQueue.main.asyncAfter(deadline: .now() + crossfadeDuration + 0.2) {
             if self.isPlaying { outgoingPlayer.pause(); outgoingPlayer.currentTime = 0 }
         }
@@ -162,6 +165,7 @@ class AudioEngineManager: ObservableObject {
     private var wasPlayingWhenBackgrounded = false, usageTimer: Timer?
     @Published var continuousPlayTime: TimeInterval = 0
     @Published var showPremiumUpsell = false
+    @Published var triggerFlash = false
     private var volumeTask: Task<Void, Never>?, oscillationTask: Task<Void, Never>?
     @Published var isBackgroundAudioEnabled: Bool { didSet { UserDefaults.standard.set(isBackgroundAudioEnabled, forKey: "isBackgroundAudioEnabled"); configureAudioSession() } }
     @Published var isMixerModeEnabled: Bool { didSet { UserDefaults.standard.set(isMixerModeEnabled, forKey: "isMixerModeEnabled"); configureAudioSession() } }
@@ -211,7 +215,16 @@ class AudioEngineManager: ObservableObject {
         if type == .began { DispatchQueue.main.async { self.isPlaying = false } }
         else if type == .ended, let options = (userInfo[AVAudioSessionInterruptionOptionKey] as? UInt).map(AVAudioSession.InterruptionOptions.init), options.contains(.shouldResume) { self.play() }
     }
-    private func setupTracks() { tracks.removeAll(); for fileName in fileNames { tracks.append(SoundTrack(fileName: fileName)) } }
+    private func setupTracks() {
+        tracks.removeAll()
+        for fileName in fileNames {
+            let track = SoundTrack(fileName: fileName)
+            if fileName == "Blizzard" {
+                track.onLoop = { [weak self] in DispatchQueue.main.async { self?.triggerFlash.toggle() } }
+            }
+            tracks.append(track)
+        }
+    }
     private func updateRandomizerState() {
         volumeTask?.cancel(); oscillationTask?.cancel()
         guard isPlaying else { return }
