@@ -1,10 +1,10 @@
 import SwiftUI
-
 struct RainParticle: Identifiable { let id = UUID(); var x: CGFloat; var y: CGFloat; var speed: Double; var opacity: Double; var scale: Double; var length: CGFloat }
 struct RainEffectView: View {
     var intensity: Double
+    var windAngle: Double
     @State private var particles = [RainParticle]()
-    private var targetParticleCount: Int { return intensity > 0 ? Int(50 + (150 * intensity)) : 0 }
+    private var targetParticleCount: Int { return intensity > 0 ? Int(300 + (800 * intensity)) : 0 }
     var body: some View {
         GeometryReader { geometry in
             TimelineView(.animation(minimumInterval: 0.016)) { timeline in
@@ -15,7 +15,8 @@ struct RainEffectView: View {
                         particleContext.fill(Capsule().path(in: frame), with: .color(.white.opacity(0.7)))
                     }
                 }
-                .rotationEffect(.degrees(10)).opacity(intensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: intensity > 0)
+                .rotationEffect(.degrees(10 + (windAngle * 5)))
+                .opacity(intensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: intensity > 0)
                 .onChange(of: timeline.date) {
                     let volumeSpeedMultiplier = 1.0 + (intensity * 0.3)
                     for i in particles.indices {
@@ -43,7 +44,7 @@ struct FireGlowView: View {
     let intensity: Double
     @State private var isAnimating1 = false
     @State private var isAnimating2 = false
-    private var glowScale: CGFloat { 0.5 + (intensity * 0.5) }
+    private var glowScale: CGFloat { 0.5 + (intensity * 1) }
     var body: some View {
         ZStack {
             Ellipse().fill(Color.orange.opacity(0.6)).frame(width: 300 * glowScale, height: 100 * glowScale).blur(radius: 60).scaleEffect(isAnimating1 ? 1.05 : 0.95, anchor: .bottom).opacity(isAnimating1 ? 0.7 : 0.5)
@@ -55,9 +56,10 @@ struct FireGlowView: View {
     }
 }
 struct FireEffectView: View {
+    var ParticleSize = 8.0
     var intensity: Double
     @State private var particles = [FireParticle]()
-    private var targetParticleCount: Int { Int(10 + (60 * intensity)) }
+    private var targetParticleCount: Int { Int(10 + (100 * intensity)) }
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -66,7 +68,7 @@ struct FireEffectView: View {
                     Canvas { context, size in
                         for particle in particles {
                             var particleContext = context; particleContext.opacity = particle.opacity
-                            let frame = CGRect(x: particle.x, y: particle.y, width: 8 * particle.scale, height: 8 * particle.scale)
+                            let frame = CGRect(x: particle.x, y: particle.y, width: ParticleSize * particle.scale, height: ParticleSize * particle.scale)
                             let shape = createEmberShape(in: frame, seed: particle.shapeSeed, time: timeline.date.timeIntervalSinceReferenceDate)
                             particleContext.addFilter(.shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)); particleContext.fill(shape, with: .color(particle.color))
                         }

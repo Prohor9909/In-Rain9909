@@ -114,11 +114,11 @@ struct ContentView: View {
     
     let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "bolt.fill", "waveform"]
     let sliderColors: [[Color]] = [
-        [Color(red: 0.4, green: 0.8, blue: 1.0), Color(red: 0.0, green: 0.2, blue: 0.8)],
-        [Color.orange, Color.red],
-        [Color.yellow, Color.teal],
-        [Color.cyan, Color.mint],
-        [Color(red: 0.0, green: 0.5, blue: 0.5), Color(red: 0.0, green: 0.0, blue: 0.3)]
+        [Color.black.opacity(0.6), Color.blue],
+        [Color.black.opacity(0.6), Color.red],
+        [Color.black.opacity(0.6), Color.green],
+        [Color.black.opacity(0.6), Color.yellow],
+        [Color.black.opacity(0.6), Color.brown]
     ]
     
     var isAnyBulbOn: Bool { bulbValues.contains(where: { $0 > 0 }) }
@@ -127,7 +127,9 @@ struct ContentView: View {
         ZStack {
             ZStack {
                 Image("background").resizable().scaledToFill().ignoresSafeArea().blur(radius: 10).onTapGesture { withAnimation { showProfiles = false } }
-                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0, windAngle: bulbValues[2])
+                    .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+                    .padding(-200)
                 FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
             }.ignoresSafeArea(.keyboard)
             
@@ -147,6 +149,7 @@ struct ContentView: View {
                 }
                 
                 Spacer()
+                
                 HStack(spacing: 8) {
                     ForEach(0..<5, id: \.self) { idx in
                         ControlView(
@@ -159,71 +162,76 @@ struct ContentView: View {
                         .onChange(of: bulbValues[idx]) { _, _ in updateVolume(for: idx) }
                     }
                 }
+                .offset(y: showProfiles ? 0 : 60)
                 
-                Button(action: { withAnimation { showProfiles.toggle() } }) {
+                Button(
+                    action: {
+                        withAnimation(.bouncy)
+                        {
+                            showProfiles.toggle()
+                        }
+                    }) {
                     Text(currentProfileButtonText).font(.caption).bold().foregroundColor(.white).textCase(.uppercase).tracking(2).padding(.top, 20)
                 }
+                    .offset(y: showProfiles ? 0 : 60)
                 
-                Spacer()
                 
-                if showProfiles {
-                    HStack(spacing: 15) {
-                        ForEach(0..<5, id: \.self) { index in
-                            if index < profileManager.profiles.count {
-                                let profile = profileManager.profiles[index]
-                                let template = index < presetTemplates.count ? presetTemplates[index] : presetTemplates[0]
+                HStack(spacing: 15) {
+                    ForEach(0..<5, id: \.self) { index in
+                        if index < profileManager.profiles.count {
+                            let profile = profileManager.profiles[index]
+                            let template = index < presetTemplates.count ? presetTemplates[index] : presetTemplates[0]
+                            
+                            Button(action: {
+                                withAnimation {
+                                    bulbValues = profile.bulbValues
+                                    activeProfileId = profile.id
+                                }
+                                for idx in 0..<bulbValues.count { updateVolume(for: idx) }
+                                let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
+                            }) {
+                                Image(systemName: template.icon)
+                                    .foregroundColor(.white)
+                                    .padding(15)
+                                    .rotationEffect(.degrees(reRotating[index] ? -360 : profileRotations[index]))
+                                    .scaleEffect(reRotating[index] ? 0.8 : (overRotating[index] ? 1.5 : 1.0))
+                                    .glassEffect(.clear)
+                                    .clipShape(Circle())
+                            }
+                            .contextMenu {
+                                Button {
+                                    profileToRename = profile
+                                    renameText = profile.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
                                 
-                                Button(action: {
+                                Button {
+                                    profileManager.updateProfileSettings(id: profile.id, values: bulbValues)
+                                    let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
+                                    animateProfileOverwrite(at: index)
+                                } label: {
+                                    Label("Overwrite", systemImage: "arrow.triangle.2.circlepath")
+                                        .foregroundColor(.orange)
+                                }
+                                
+                                Button(role: .destructive) {
+                                    let resetValues = template.values
+                                    
+                                    profileManager.updateProfile(id: profile.id, newName: template.name)
+                                    profileManager.updateProfileSettings(id: profile.id, values: resetValues)
+                                    
                                     withAnimation {
-                                        bulbValues = profile.bulbValues
+                                        bulbValues = resetValues
                                         activeProfileId = profile.id
                                     }
                                     for idx in 0..<bulbValues.count { updateVolume(for: idx) }
-                                    let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
-                                }) {
-                                    Image(systemName: template.icon)
-                                        .foregroundColor(.white)
-                                        .padding(15)
-                                        .rotationEffect(.degrees(reRotating[index] ? -360 : profileRotations[index]))
-                                        .scaleEffect(reRotating[index] ? 0.8 : (overRotating[index] ? 1.5 : 1.0))
-                                        .glassEffect(.clear)
-                                        .clipShape(Circle())
-                                }
-                                .contextMenu {
-                                    Button {
-                                        profileToRename = profile
-                                        renameText = profile.name
-                                        showRenameAlert = true
-                                    } label: {
-                                        Label("Rename", systemImage: "pencil")
-                                    }
                                     
-                                    Button {
-                                        profileManager.updateProfileSettings(id: profile.id, values: bulbValues)
-                                        let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-                                        animateProfileOverwrite(at: index)
-                                    } label: {
-                                        Label("Overwrite", systemImage: "arrow.triangle.2.circlepath")
-                                            .foregroundColor(.orange)
-                                    }
-                                    
-                                    Button(role: .destructive) {
-                                        let resetValues = template.values
-                                        
-                                        profileManager.updateProfile(id: profile.id, newName: template.name)
-                                        profileManager.updateProfileSettings(id: profile.id, values: resetValues)
-                                        
-                                        withAnimation {
-                                            bulbValues = resetValues
-                                            activeProfileId = profile.id
-                                        }
-                                        for idx in 0..<bulbValues.count { updateVolume(for: idx) }
-                                        
-                                        let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-                                        animateProfileReset(at: index)
-                                    } label: {
-                                        Label("Reset", systemImage: "arrow.counterclockwise")
-                                    }
+                                    let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
+                                    animateProfileReset(at: index)
+                                } label: {
+                                    Label("Reset", systemImage: "arrow.counterclockwise")
                                 }
                             }
                         }
@@ -245,6 +253,8 @@ struct ContentView: View {
                     Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill").font(.largeTitle).foregroundStyle(.white).padding(35).glassEffect(.clear)
                 }
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0).animation(.spring, value: audioManager.isPlaying)
+                .offset(y: -30)
+
                 Spacer()
                 
                 HStack(spacing: 10) {
