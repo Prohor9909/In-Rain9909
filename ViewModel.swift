@@ -14,18 +14,49 @@ class TimerManager: ObservableObject {
     
     func setAudioManager(_ manager: AudioEngineManager) { self.audioManager = manager }
     func startTimer(duration: TimeInterval) {
-        stopTimer(); totalDuration = duration; timeRemaining = duration; isTimerActive = true; isPaused = false
-        audioManager?.play(); createTimer()
+        withAnimation{
+            stopTimer()
+            totalDuration = duration
+            timeRemaining = duration
+            isTimerActive = true
+            isPaused = false
+            audioManager?.play()
+            createTimer()
+        }
     }
-    func pauseTimer() { guard isTimerActive else { return }; timer?.invalidate(); timer = nil; isPaused = true }
-    func resumeTimer() { guard isTimerActive, isPaused, timeRemaining > 0 else { return }; isPaused = false; createTimer() }
+    func pauseTimer() {
+        withAnimation{
+            guard isTimerActive else { return }
+            timer?.invalidate()
+            timer = nil
+            isPaused = true
+        }
+    }
+    func resumeTimer() {
+        withAnimation{
+            guard isTimerActive, isPaused, timeRemaining > 0 else { return }
+            isPaused = false
+            createTimer()
+        }
+    }
     private func createTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             if let self = self { if self.timeRemaining > 0 { self.timeRemaining -= 1 } else { self.timerFinished() } }
         }
     }
-    func stopTimer() { timer?.invalidate(); timer = nil; isTimerActive = false; isPaused = false; timeRemaining = 0; totalDuration = 0 }
+    func stopTimer() {
+        withAnimation{
+            timer?.invalidate()
+            timer = nil
+            isTimerActive = false
+            isPaused = false
+            timeRemaining = 0
+            totalDuration = 0
+        }
+    }
+    
+    
     private func timerFinished() { stopTimer(); audioManager?.stop() }
     var progress: Double { guard totalDuration > 0 else { return 0 }; return timeRemaining / totalDuration }
     var formattedTime: String {

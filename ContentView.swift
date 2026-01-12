@@ -37,7 +37,7 @@ struct ContentView: View {
     
     @State private var bulbValues: [Double] = [0.45, 0.45, 0.45, 0.45, 0.45]
     @State private var isRandomizing = false
-    @State private var shuffleRotation = 0.0
+    @State private var shuffleRotation = -30.0
     
     @State private var profileRotations: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
     @State private var overRotating: [Bool] = [false, false, false, false, false]
@@ -88,26 +88,54 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             ZStack {
-                Image("background").resizable().scaledToFill().ignoresSafeArea().blur(radius: 10).onTapGesture { withAnimation { showProfiles = false } }
+                Color.clear
+                    .background {
+                        Image("background")
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                            .blur(radius: 10)
+                            .onTapGesture {
+                                withAnimation {
+                                    showProfiles = false
+                                }
+                            }
+
+                    }
                 RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0, windAngle: bulbValues[2])
-                    .edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+                    .edgesIgnoringSafeArea(.all)
+                    .allowsHitTesting(false)
                     .padding(-200)
-                FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
-            }.ignoresSafeArea(.keyboard)
+                
+                FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0)
+                    .edgesIgnoringSafeArea(.all)
+                    .allowsHitTesting(false)
+            }
             
             VStack(spacing: 0) {
-                if timerManager.isTimerActive && !showProfiles {
+                
+                if timerManager.isTimerActive {
                     Button(action: { showTimerDetail = true }) {
                         HStack {
                             ZStack {
                                 Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
-                                Circle().trim(from: 0, to: CGFloat(timerManager.progress)).stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 20, height: 20)
-                            }.frame(width: 20, height: 20)
-                            Text(timerManager.formattedTime).font(.title2).monospacedDigit().foregroundColor(.white)
+                                Circle().trim(from: 0, to: CGFloat(timerManager.progress))
+                                    .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                    .rotationEffect(.degrees(-90))
+                                    .frame(width: 20, height: 20)
+                            }
+                            .frame(width: 20, height: 20)
+                            Text(timerManager.formattedTime)
+                                .font(.title2)
+                                .monospacedDigit()
+                                .foregroundColor(.white)
                         }
-                        .padding(10).padding(.horizontal, 10).glassEffect(.clear)
+                        .padding(10)
+                        .padding(.horizontal, 10)
+                        .glassEffect(.clear)
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity)).frame(maxWidth: .infinity).animation(.spring(), value: timerManager.isTimerActive)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.spring(), value: timerManager.isTimerActive)
                 }
                 
                 Spacer()
@@ -118,13 +146,13 @@ struct ContentView: View {
                             value: $bulbValues[idx],
                             activeIcon: sliderIcons[idx],
                             activeColors: sliderColors[idx],
-                            iconColorOverride: (idx == 3 || idx == 4) ? sliderColors[idx].first : nil,
                             onUpdate: { updateVolume(for: idx) }
                         )
                         .onChange(of: bulbValues[idx]) { _, _ in updateVolume(for: idx) }
                     }
                 }
-                .offset(y: showProfiles ? 0 : 60)
+                
+                Spacer()
                 
                 Button(
                     action: {
@@ -133,8 +161,7 @@ struct ContentView: View {
                     }) {
                     Text(currentProfileButtonText).font(.caption).bold().foregroundColor(.white).textCase(.uppercase).tracking(2).padding(.top, 20)
                 }
-                    .offset(y: showProfiles ? 0 : 60)
-                
+                    .offset(y: showProfiles ? -20 : 0)
                 
                 HStack(spacing: 15) {
                     ForEach(0..<5, id: \.self) { index in
@@ -152,7 +179,7 @@ struct ContentView: View {
                             }) {
                                 Image(systemName: template.icon)
                                     .foregroundColor(.white)
-                                    .padding(15)
+                                    .frame(width: 45, height: 45)
                                     .rotationEffect(.degrees(reRotating[index] ? -360 : profileRotations[index]))
                                     .scaleEffect(reRotating[index] ? 0.8 : (overRotating[index] ? 1.5 : 1.0))
                                     .glassEffect(.clear)
@@ -198,6 +225,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 20)
                     .scaleEffect(showProfiles ? 1 : 0)
+                    .offset(y: showProfiles ? -20 : 0)
                 }
                 
                 Spacer()
@@ -210,25 +238,41 @@ struct ContentView: View {
                         audioManager.play(); if timerManager.isTimerActive && timerManager.isPaused { timerManager.resumeTimer() }
                     }
                 }) {
-                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill").font(.largeTitle).foregroundStyle(.white).padding(35).glassEffect(.clear)
+                    Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.white)
+                        .frame(width: 100, height: 100)
+                        .glassEffect(.clear)
                 }
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0).animation(.spring, value: audioManager.isPlaying)
-                .offset(y: -30)
 
                 Spacer()
                 
-                HStack(spacing: 10) {
+                HStack(spacing: 15) {
                     Button(action: randomizeMix) {
-                        Image(systemName: "scribble").padding(15).rotationEffect(.degrees(shuffleRotation)).foregroundStyle(.white).glassEffect(.clear).scaleEffect(isRandomizing ? 1.5 : 1.0)
+                        Image(systemName: "scribble")
+                            .frame(width: 45, height: 45)
+                            .rotationEffect(.degrees(shuffleRotation))
+                            .foregroundStyle(.white)
+                            .glassEffect(.clear)
+                            .scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); withAnimation{
-                             }
+                            audioManager.isRandomVolumeEnabled.toggle()
+                            audioManager.isRandomOscillationEnabled.toggle()
+                        }
                     }) {
-                        Image(systemName: "plus").font(.title2).padding(15).foregroundStyle(.white).glassEffect(.clear).opacity(isCurrentMixSaved ? 0.5 : 1.0)
-                    }.disabled(isCurrentMixSaved)
+                        Image(systemName: "waveform")
+                            .font(.title2)
+                            .frame(width: 45, height: 45)
+                            .foregroundStyle((audioManager.isRandomVolumeEnabled && audioManager.isRandomOscillationEnabled) ? .green : .white)
+                            .glassEffect(.clear)
+                    }
                     Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); if timerManager.isTimerActive {
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
+                        if timerManager.isTimerActive {
                             withAnimation {
                                 showTimerDetail = true
                             }
@@ -240,26 +284,34 @@ struct ContentView: View {
                     }) {
                         Image(systemName: "timer")
                             .font(.title)
-                            .padding(20)
+                            .frame(width: 70, height: 70)
                             .foregroundStyle(timerManager.isTimerActive ? .orange : .white)
-//                            .foregroundStyle(.white)
                             .glassEffect(.clear)
                     }
-                    .contentShape(Circle()).zIndex(1)
                     .contextMenu {
                         Button { timerManager.startTimer(duration: 15 * 60) } label: { Text("15 Minutes") }
                         Button { timerManager.startTimer(duration: 30 * 60) } label: { Text("30 Minutes") }
                         Button { timerManager.startTimer(duration: 60 * 60) } label: { Text("60 Minutes") }
                     }
-                    AirPlayButton().frame(width: 45, height: 45).foregroundStyle(.white).padding(4).glassEffect(.clear)
+                    
+                    AirPlayButton()
+                        .frame(width: 45, height: 45)
+                        .foregroundStyle(.white)
+                        .glassEffect(.clear)
+                    
                     Button(action: { let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); showSettings = true }) {
-                        Image(systemName: "gearshape.fill").foregroundStyle(.white).padding(15).glassEffect(.clear)
+                        Image(systemName: "gearshape.fill")
+                            .foregroundStyle(.white)
+                            .frame(width: 45, height: 45)
+                            .glassEffect(.clear)
                     }
                 }
                 .animation(.spring(), value: timerManager.isTimerActive)
-                .offset(y: UIDevice.current.userInterfaceIdiom == .pad ? -200 : 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+//            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             timerManager.setAudioManager(audioManager)
@@ -324,11 +376,15 @@ struct ContentView: View {
     
     private func randomizeMix() {
         let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-        withAnimation { shuffleRotation = 15 }
-        withAnimation { isRandomizing = true }
+        withAnimation {
+            shuffleRotation = 15
+            isRandomizing = true
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation { shuffleRotation = 0 }
-            withAnimation { isRandomizing = false }
+            withAnimation {
+                shuffleRotation = -30
+                isRandomizing = false
+            }
         }
         withAnimation {
             for i in 0..<bulbValues.count { bulbValues[i] = 0.0 }
