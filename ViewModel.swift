@@ -228,15 +228,15 @@ class AudioEngineManager: ObservableObject {
     func stop() { for track in tracks { track.pause() }; isPlaying = false }
 }
 
-struct SoundProfile: Identifiable, Codable { let id: UUID; let name: String; let bulbValues: [Double]; let bulbToggles: [Bool] }
+struct SoundProfile: Identifiable, Codable { let id: UUID; let name: String; let bulbValues: [Double] }
 class ProfileManager: ObservableObject {
     @Published var profiles: [SoundProfile] = [] {
         didSet { if let encoded = try? JSONEncoder().encode(profiles) { UserDefaults.standard.set(encoded, forKey: "saved_sound_profiles") } }
     }
     init() { if let data = UserDefaults.standard.data(forKey: "saved_sound_profiles"), let decoded = try? JSONDecoder().decode([SoundProfile].self, from: data) { profiles = decoded } }
-    func saveProfile(name: String, values: [Double], toggles: [Bool]) { profiles.append(SoundProfile(id: UUID(), name: name, bulbValues: values, bulbToggles: toggles)) }
-    func updateProfileByName(name: String, values: [Double], toggles: [Bool]) { if let index = profiles.firstIndex(where: { $0.name == name }) { profiles[index] = SoundProfile(id: profiles[index].id, name: name, bulbValues: values, bulbToggles: toggles) } }
-    func updateProfileSettings(id: UUID, values: [Double], toggles: [Bool]) { if let index = profiles.firstIndex(where: { $0.id == id }) { profiles[index] = SoundProfile(id: id, name: profiles[index].name, bulbValues: values, bulbToggles: toggles) } }
+    func saveProfile(name: String, values: [Double]) { profiles.append(SoundProfile(id: UUID(), name: name, bulbValues: values)) }
+    func updateProfileByName(name: String, values: [Double]) { if let index = profiles.firstIndex(where: { $0.name == name }) { profiles[index] = SoundProfile(id: profiles[index].id, name: name, bulbValues: values) } }
+    func updateProfileSettings(id: UUID, values: [Double]) { if let index = profiles.firstIndex(where: { $0.id == id }) { profiles[index] = SoundProfile(id: id, name: profiles[index].name, bulbValues: values) } }
     func deleteProfile(id: UUID) { if let index = profiles.firstIndex(where: { $0.id == id }) { profiles.remove(at: index) } }
-    func updateProfile(id: UUID, newName: String) { if let index = profiles.firstIndex(where: { $0.id == id }) { let old = profiles[index]; profiles[index] = SoundProfile(id: id, name: newName, bulbValues: old.bulbValues, bulbToggles: old.bulbToggles) } }
+    func updateProfile(id: UUID, newName: String) { if let index = profiles.firstIndex(where: { $0.id == id }) { let old = profiles[index]; profiles[index] = SoundProfile(id: id, name: newName, bulbValues: old.bulbValues) } }
 }

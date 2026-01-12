@@ -53,7 +53,6 @@ struct PresetTemplate {
     let name: String
     let icon: String
     let values: [Double]
-    let toggles: [Bool]
 }
 
 struct ContentView: View {
@@ -75,11 +74,9 @@ struct ContentView: View {
     @State private var renameText = ""
     
     @State private var bulbValues: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
-    @State private var bulbToggles: [Bool] = [false, false, false, false, false]
     @State private var isRandomizing = false
     @State private var shuffleRotation = 0.0
     
-    // Updated to support 5 profiles
     @State private var profileRotations: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
     @State private var overRotating: [Bool] = [false, false, false, false, false]
     @State private var reRotating: [Bool] = [false, false, false, false, false]
@@ -87,23 +84,23 @@ struct ContentView: View {
     @State private var activeProfileId: UUID? = nil
     
     private let presetTemplates: [PresetTemplate] = [
-        PresetTemplate(name: "Focus", icon: "brain.head.profile", values: [0.5, 0.5, 0.5, 0.5, 0.5], toggles: [true, true, true, true, true]),
-        PresetTemplate(name: "Relax", icon: "wind", values: [0.5, 0.5, 0.5, 0.5, 0.5], toggles: [true, true, true, true, true]),
-        PresetTemplate(name: "Energy", icon: "bolt.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5], toggles: [true, true, true, true, true]),
-        PresetTemplate(name: "Sleep", icon: "moon.stars.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5], toggles: [true, true, true, true, true]),
-        PresetTemplate(name: "Zen", icon: "leaf.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5], toggles: [true, true, true, true, true])
+        PresetTemplate(name: "Focus", icon: "brain.head.profile", values: [0.45, 0.45, 0.45, 0.45, 0.45]),
+        PresetTemplate(name: "Relax", icon: "wind", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Energy", icon: "bolt.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Sleep", icon: "moon.stars.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Zen", icon: "leaf.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5])
     ]
     
     private var currentProfileButtonText: String {
         if let activeId = activeProfileId,
            let match = profileManager.profiles.first(where: { $0.id == activeId }),
-           match.bulbValues == bulbValues && match.bulbToggles == bulbToggles {
+           match.bulbValues == bulbValues {
             let name = match.name
             if name.count > 15 { return String(name.prefix(15)) + "..." }
             return name
         }
         
-        if let match = profileManager.profiles.first(where: { $0.bulbValues == bulbValues && $0.bulbToggles == bulbToggles }) {
+        if let match = profileManager.profiles.first(where: { $0.bulbValues == bulbValues }) {
             let name = match.name
             if name.count > 15 { return String(name.prefix(15)) + "..." }
             return name
@@ -112,7 +109,7 @@ struct ContentView: View {
     }
     
     private var isCurrentMixSaved: Bool {
-        profileManager.profiles.contains(where: { $0.bulbValues == bulbValues && $0.bulbToggles == bulbToggles })
+        profileManager.profiles.contains(where: { $0.bulbValues == bulbValues })
     }
     
     let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "bolt.fill", "waveform"]
@@ -124,14 +121,14 @@ struct ContentView: View {
         [Color(red: 0.0, green: 0.5, blue: 0.5), Color(red: 0.0, green: 0.0, blue: 0.3)]
     ]
     
-    var isAnyBulbOn: Bool { bulbToggles.contains(true) }
+    var isAnyBulbOn: Bool { bulbValues.contains(where: { $0 > 0 }) }
     
     var body: some View {
         ZStack {
             ZStack {
                 Image("background").resizable().scaledToFill().ignoresSafeArea().blur(radius: 10).onTapGesture { withAnimation { showProfiles = false } }
-                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(0) && bulbToggles[0]) ? bulbValues[0] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
-                FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbToggles.indices.contains(1) && bulbToggles[1]) ? bulbValues[1] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
+                FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0).edgesIgnoringSafeArea(.all).allowsHitTesting(false)
             }.ignoresSafeArea(.keyboard)
             
             VStack(spacing: 0) {
@@ -153,13 +150,13 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<5, id: \.self) { idx in
                         ControlView(
-                            value: $bulbValues[idx], isOn: $bulbToggles[idx],
-                            activeIcon: sliderIcons[idx], activeColors: sliderColors[idx],
+                            value: $bulbValues[idx],
+                            activeIcon: sliderIcons[idx],
+                            activeColors: sliderColors[idx],
                             iconColorOverride: (idx == 3 || idx == 4) ? sliderColors[idx].first : nil,
                             onUpdate: { updateVolume(for: idx) }
                         )
                         .onChange(of: bulbValues[idx]) { _, _ in updateVolume(for: idx) }
-                        .onChange(of: bulbToggles[idx]) { _, isOn in updateVolume(for: idx) }
                     }
                 }
                 
@@ -179,7 +176,6 @@ struct ContentView: View {
                                 Button(action: {
                                     withAnimation {
                                         bulbValues = profile.bulbValues
-                                        bulbToggles = profile.bulbToggles
                                         activeProfileId = profile.id
                                     }
                                     for idx in 0..<bulbValues.count { updateVolume(for: idx) }
@@ -192,7 +188,7 @@ struct ContentView: View {
                                         .scaleEffect(reRotating[index] ? 0.8 : (overRotating[index] ? 1.5 : 1.0))
                                         .glassEffect(.clear)
                                         .clipShape(Circle())
-                                        }
+                                }
                                 .contextMenu {
                                     Button {
                                         profileToRename = profile
@@ -203,7 +199,7 @@ struct ContentView: View {
                                     }
                                     
                                     Button {
-                                        profileManager.updateProfileSettings(id: profile.id, values: bulbValues, toggles: bulbToggles)
+                                        profileManager.updateProfileSettings(id: profile.id, values: bulbValues)
                                         let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
                                         animateProfileOverwrite(at: index)
                                     } label: {
@@ -213,15 +209,12 @@ struct ContentView: View {
                                     
                                     Button(role: .destructive) {
                                         let resetValues = template.values
-                                        let resetToggles = template.toggles
                                         
-                                        // Reset Name as well
                                         profileManager.updateProfile(id: profile.id, newName: template.name)
-                                        profileManager.updateProfileSettings(id: profile.id, values: resetValues, toggles: resetToggles)
+                                        profileManager.updateProfileSettings(id: profile.id, values: resetValues)
                                         
                                         withAnimation {
                                             bulbValues = resetValues
-                                            bulbToggles = resetToggles
                                             activeProfileId = profile.id
                                         }
                                         for idx in 0..<bulbValues.count { updateVolume(for: idx) }
@@ -289,7 +282,7 @@ struct ContentView: View {
                     if profileManager.profiles.contains(where: { $0.name == name }) {
                         tempProfileName = name; showOverwriteAlert = true
                     } else {
-                        profileManager.saveProfile(name: name, values: bulbValues, toggles: bulbToggles)
+                        profileManager.saveProfile(name: name, values: bulbValues)
                     }
                 }
             }
@@ -298,12 +291,11 @@ struct ContentView: View {
             timerManager.setAudioManager(audioManager)
             for idx in 0..<bulbValues.count { updateVolume(for: idx) }
             
-            // Updated to populate up to 5 profiles
             if profileManager.profiles.count < 5 {
                 for i in profileManager.profiles.count..<5 {
                     if i < presetTemplates.count {
                         let t = presetTemplates[i]
-                        profileManager.saveProfile(name: t.name, values: t.values, toggles: t.toggles)
+                        profileManager.saveProfile(name: t.name, values: t.values)
                     }
                 }
             }
@@ -313,14 +305,13 @@ struct ContentView: View {
         .sheet(isPresented: $showTimerDetail) { CountDownView(timerManager: timerManager) }
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
         .alert(isPresented: $showOverwriteAlert) {
-            Alert(title: Text("Profile Exists"), message: Text("Overwrite existing profile '\(tempProfileName)'?"), primaryButton: .destructive(Text("Overwrite")) { profileManager.updateProfileByName(name: tempProfileName, values: bulbValues, toggles: bulbToggles); showSaveProfileOverlay = false }, secondaryButton: .cancel { showSaveProfileOverlay = true })
+            Alert(title: Text("Profile Exists"), message: Text("Overwrite existing profile '\(tempProfileName)'?"), primaryButton: .destructive(Text("Overwrite")) { profileManager.updateProfileByName(name: tempProfileName, values: bulbValues); showSaveProfileOverlay = false }, secondaryButton: .cancel { showSaveProfileOverlay = true })
         }
         .alert("Rename Profile", isPresented: $showRenameAlert) {
             TextField("New Name", text: $renameText)
             Button("Save") { if let profile = profileToRename { profileManager.updateProfile(id: profile.id, newName: renameText) } }
             Button("Cancel", role: .cancel) { }
         }
-        .onChange(of: isAnyBulbOn) { _, newValue in }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
         .statusBarHidden(true)
     }
@@ -352,16 +343,16 @@ struct ContentView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) { isRandomizing = false }
         }
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-            for i in 0..<bulbValues.count { bulbValues[i] = 0.0; bulbToggles[i] = false }
+            for i in 0..<bulbValues.count { bulbValues[i] = 0.0 }
             let count = Int.random(in: 1...4)
             let indices = Array(0..<bulbValues.count).shuffled().prefix(count)
-            for idx in indices { bulbToggles[idx] = true; bulbValues[idx] = Double.random(in: 0.3...0.9) }
+            for idx in indices { bulbValues[idx] = Double.random(in: 0.3...0.9) }
         }
         for i in 0..<bulbValues.count { updateVolume(for: i) }
     }
     
     private func updateVolume(for index: Int) {
-        let targetVolume: Float = bulbToggles[index] ? Float(bulbValues[index]) : 0.0
+        let targetVolume: Float = Float(bulbValues[index])
         audioManager.setVolume(for: index, volume: targetVolume)
     }
 }
