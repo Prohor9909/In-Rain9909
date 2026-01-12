@@ -30,7 +30,7 @@ struct LightningEffectView: View {
             .ignoresSafeArea()
             .opacity(isEnabled ? flashMultiplier * intensity * 0.5 : 0)
             .allowsHitTesting(false)
-            .task(id: triggerFlash) {
+            .task(id: [triggerFlash, isEnabled && intensity > 0]) {
                 guard isEnabled && intensity > 0 else { return }
                 
                 try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
@@ -59,8 +59,21 @@ struct RainParticle: Identifiable { let id = UUID(); var x: CGFloat; var y: CGFl
 struct RainEffectView: View {
     var intensity: Double
     var windAngle: Double
+    var isEnabled: Bool
+    var isPlaying: Bool
     @State private var particles = [RainParticle]()
-    private var targetParticleCount: Int { return intensity > 0 ? Int(300 + (600 * intensity)) : 0 }
+    
+    private var effectiveIntensity: Double {
+        guard isEnabled else { return 0 }
+        if isPlaying {
+            return max(intensity, 0.01)
+        } else {
+            return 0.01
+        }
+    }
+    
+    private var targetParticleCount: Int { return effectiveIntensity > 0 ? Int(50 + (450 * effectiveIntensity)) : 0 }
+    
     var body: some View {
         GeometryReader { geometry in
             TimelineView(.animation(minimumInterval: 0.016)) { timeline in
@@ -72,9 +85,10 @@ struct RainEffectView: View {
                     }
                 }
                 .rotationEffect(.degrees(10 + (windAngle * 10)))
-                .opacity(intensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: intensity > 0)
+                .opacity(effectiveIntensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: effectiveIntensity > 0)
                 .onChange(of: timeline.date) {
-                    let volumeSpeedMultiplier = 1.0 + (intensity * 0.3)
+                    let currentIntensity = effectiveIntensity
+                    let volumeSpeedMultiplier = 1.0 + (currentIntensity * 0.3)
                     for i in particles.indices {
                         particles[i].y += particles[i].speed * (0.016 * 60) * 2.25 * volumeSpeedMultiplier * 0.3
                         if particles[i].y > geometry.size.height + 100 { particles[i] = createParticle(in: geometry.size, isInitial: false) }
@@ -82,7 +96,7 @@ struct RainEffectView: View {
                 }
             }
             .onAppear { particles = (0..<targetParticleCount).map { _ in createParticle(in: geometry.size, isInitial: true) } }
-            .onChange(of: intensity) {
+            .onChange(of: effectiveIntensity) {
                 let diff = targetParticleCount - particles.count
                 if diff > 0 { particles.append(contentsOf: (0..<diff).map { _ in createParticle(in: geometry.size, isInitial: false) }) }
                 else if diff < 0 { particles.removeLast(abs(diff)) }
@@ -114,12 +128,16 @@ struct FireGlowView: View {
 struct FireEffectView: View {
     var ParticleSize = 8.0
     var intensity: Double
+    var isEnabled: Bool
     @State private var particles = [FireParticle]()
-    private var targetParticleCount: Int { Int(10 + (100 * intensity)) }
+    
+    private var effectiveIntensity: Double { isEnabled ? intensity : 0 }
+    private var targetParticleCount: Int { Int(10 + (100 * effectiveIntensity)) }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                FireGlowView(intensity: intensity)
+                FireGlowView(intensity: effectiveIntensity)
                 TimelineView(.animation(minimumInterval: 0.016)) { timeline in
                     Canvas { context, size in
                         for particle in particles {
@@ -129,9 +147,9 @@ struct FireEffectView: View {
                             particleContext.addFilter(.shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)); particleContext.fill(shape, with: .color(particle.color))
                         }
                     }
-                    .opacity(intensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: intensity > 0)
+                    .opacity(effectiveIntensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: effectiveIntensity > 0)
                     .onChange(of: timeline.date) {
-                        let volumeSpeedMultiplier = 1.0 + (intensity * 0.5)
+                        let volumeSpeedMultiplier = 1.0 + (effectiveIntensity * 0.5)
                         for i in particles.indices {
                             particles[i].y -= particles[i].speed * (0.016 * 60) * volumeSpeedMultiplier; particles[i].x += sin(timeline.date.timeIntervalSinceReferenceDate * particles[i].drift) * 0.5; particles[i].opacity -= 0.008
                             if particles[i].y < geometry.size.height - 250 || particles[i].opacity <= 0 { particles[i] = createParticle(in: geometry.size) }
@@ -140,7 +158,7 @@ struct FireEffectView: View {
                 }
             }
             .onAppear { particles = (0..<targetParticleCount).map { _ in createParticle(in: geometry.size) } }
-            .onChange(of: intensity) {
+            .onChange(of: effectiveIntensity) {
                 let diff = targetParticleCount - particles.count
                 if diff > 0 { particles.append(contentsOf: (0..<diff).map { _ in createParticle(in: geometry.size) }) }
                 else if diff < 0 { particles.removeLast(abs(diff)) }

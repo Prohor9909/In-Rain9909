@@ -6,7 +6,7 @@ struct AirPlayButton: UIViewRepresentable {
         let picker = AVRoutePickerView()
         picker.backgroundColor = .clear;
         picker.activeTintColor = .orange;
-        picker.tintColor = .white.withAlphaComponent(0.7)
+        picker.tintColor = .white
         return picker
     }
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
@@ -46,11 +46,11 @@ struct ContentView: View {
     @State private var activeProfileId: UUID? = nil
     
     private let presetTemplates: [PresetTemplate] = [
-        PresetTemplate(name: "Focus", icon: "brain.head.profile", values: [0.45, 0.45, 0.45, 0.45, 0.45]),
-        PresetTemplate(name: "Relax", icon: "wind", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Energy", icon: "bolt.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Sleep", icon: "moon.stars.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Zen", icon: "leaf.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5])
+        PresetTemplate(name: "Unwind", icon: "apple.meditate", values: [0.45, 0.45, 0.45, 0.45, 0.45]),
+        PresetTemplate(name: "Study", icon: "lamp.desk.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Sleep", icon: "moon.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Isolation", icon: "person.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
+        PresetTemplate(name: "Focus", icon: "brain.filled.head.profile", values: [0.5, 0.5, 0.5, 0.5, 0.5])
     ]
     
     private var currentProfileButtonText: String {
@@ -114,14 +114,22 @@ struct ContentView: View {
                     isEnabled: audioManager.isParticleEffectsEnabled
                 )
                 
-                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0)) ? max(bulbValues[0], 0.01) : 0.0, windAngle: bulbValues[2])
-                    .edgesIgnoringSafeArea(.all)
-                    .allowsHitTesting(false)
-                    .padding(-200)
+                RainEffectView(
+                    intensity: bulbValues.indices.contains(0) ? bulbValues[0] : 0.0,
+                    windAngle: bulbValues[2],
+                    isEnabled: audioManager.isParticleEffectsEnabled,
+                    isPlaying: audioManager.isPlaying
+                )
+                .edgesIgnoringSafeArea(.all)
+                .allowsHitTesting(false)
+                .padding(-200)
                 
-                FireEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0)
-                    .edgesIgnoringSafeArea(.all)
-                    .allowsHitTesting(false)
+                FireEffectView(
+                    intensity: (audioManager.isPlaying && bulbValues.indices.contains(1) && bulbValues[1] > 0) ? bulbValues[1] : 0.0,
+                    isEnabled: audioManager.isParticleEffectsEnabled
+                )
+                .edgesIgnoringSafeArea(.all)
+                .allowsHitTesting(false)
             }
             
             VStack(spacing: 0) {
@@ -263,9 +271,9 @@ struct ContentView: View {
                 HStack(spacing: 15) {
                     Button(action: randomizeMix) {
                         Image(systemName: "scribble")
-                            .frame(width: 45, height: 45)
                             .rotationEffect(.degrees(shuffleRotation))
                             .foregroundStyle(.white)
+                            .frame(width: 45, height: 45)
                             .glassEffect(.clear)
                             .scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
@@ -275,10 +283,10 @@ struct ContentView: View {
                             audioManager.isRandomOscillationEnabled.toggle()
                         }
                     }) {
-                        Image(systemName: "aqi.medium")
+                        Image(systemName: "wind")
                             .font(.title2)
-                            .frame(width: 45, height: 45)
                             .foregroundStyle((audioManager.isRandomVolumeEnabled && audioManager.isRandomOscillationEnabled) ? .orange : .white)
+                            .frame(width: 45, height: 45)
                             .glassEffect(.clear)
                     }
                     Button(action: {
@@ -296,8 +304,8 @@ struct ContentView: View {
                     }) {
                         Image(systemName: "timer")
                             .font(.title)
-                            .frame(width: 70, height: 70)
                             .foregroundStyle(timerManager.isTimerActive ? .orange : .white)
+                            .frame(width: 70, height: 70)
                             .glassEffect(.clear)
                     }
                     .contextMenu {
@@ -307,14 +315,15 @@ struct ContentView: View {
                     }
                     
                     AirPlayButton()
+                        .scaleEffect(1.1)
                         .frame(width: 45, height: 45)
-                        .foregroundStyle(.white)
                         .glassEffect(.clear)
                     
                     Button(action: { let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); showSettings = true }) {
-                        Image(systemName: "gearshape.fill")
+                        Image(systemName: "gear")
+                            .font(.title2)
                             .foregroundStyle(.white)
-                            .frame(width: 45, height: 45)
+                            .frame(width: 47, height: 47)
                             .glassEffect(.clear)
                     }
                 }

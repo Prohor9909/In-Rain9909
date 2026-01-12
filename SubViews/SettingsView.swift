@@ -35,7 +35,7 @@ struct SettingsView: View {
                         Toggle("Mixer Mode", isOn: $audioManager.isMixerModeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                     }
                 }.listRowBackground(Color.white.opacity(0.1))
-                Section(header: Text("Predictability").foregroundColor(.gray), footer: Text("Create subtle natural variations to your mix.").foregroundColor(.gray)) {
+                Section(header: Text("Ambience").foregroundColor(.gray), footer: Text("Create subtle natural variations to your mix.").foregroundColor(.gray)) {
                     Toggle("Dynamic Intensity", isOn: $audioManager.isRandomVolumeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                     Toggle("Spatial Polarization", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
                 }.listRowBackground(Color.white.opacity(0.1))
