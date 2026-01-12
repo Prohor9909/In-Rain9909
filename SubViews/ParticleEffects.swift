@@ -1,5 +1,18 @@
 import SwiftUI
 
+struct RumbleEffectView: View {
+    var intensity: Double
+    var isEnabled: Bool
+    
+    var body: some View {
+        Color.black
+            .opacity(isEnabled ? intensity * 0.6 : 0.0)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .animation(.linear(duration: 0.5), value: intensity)
+    }
+}
+
 struct LightningEffectView: View {
     var intensity: Double
     var triggerFlash: Bool
@@ -47,7 +60,7 @@ struct RainEffectView: View {
     var intensity: Double
     var windAngle: Double
     @State private var particles = [RainParticle]()
-    private var targetParticleCount: Int { return intensity > 0 ? Int(300 + (800 * intensity)) : 0 }
+    private var targetParticleCount: Int { return intensity > 0 ? Int(300 + (600 * intensity)) : 0 }
     var body: some View {
         GeometryReader { geometry in
             TimelineView(.animation(minimumInterval: 0.016)) { timeline in
@@ -58,7 +71,7 @@ struct RainEffectView: View {
                         particleContext.fill(Capsule().path(in: frame), with: .color(.white.opacity(0.7)))
                     }
                 }
-                .rotationEffect(.degrees(10 + (windAngle * 5)))
+                .rotationEffect(.degrees(10 + (windAngle * 10)))
                 .opacity(intensity > 0 ? 1.0 : 0.0).animation(.linear(duration: 0.3), value: intensity > 0)
                 .onChange(of: timeline.date) {
                     let volumeSpeedMultiplier = 1.0 + (intensity * 0.3)

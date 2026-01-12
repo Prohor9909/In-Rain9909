@@ -103,13 +103,18 @@ struct ContentView: View {
 
                     }
                 
+                RumbleEffectView(
+                    intensity: bulbValues[4],
+                    isEnabled: audioManager.isParticleEffectsEnabled
+                )
+                
                 LightningEffectView(
                     intensity: bulbValues[3],
                     triggerFlash: audioManager.triggerFlash,
                     isEnabled: audioManager.isParticleEffectsEnabled
                 )
                 
-                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0) && bulbValues[0] > 0) ? bulbValues[0] : 0.0, windAngle: bulbValues[2])
+                RainEffectView(intensity: (audioManager.isParticleEffectsEnabled && bulbValues.indices.contains(0)) ? max(bulbValues[0], 0.01) : 0.0, windAngle: bulbValues[2])
                     .edgesIgnoringSafeArea(.all)
                     .allowsHitTesting(false)
                     .padding(-200)

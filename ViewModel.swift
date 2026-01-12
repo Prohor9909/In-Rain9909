@@ -160,7 +160,7 @@ class SoundTrack: NSObject {
 
 class AudioEngineManager: ObservableObject {
     private var tracks: [SoundTrack] = []
-    private let fileNames = ["rain", "fireplace", "umbrella", "Blizzard", "ocean"]
+    private let fileNames = ["Rain", "Fire", "Splash", "Thunder", "Rumbling"]
     private var individualVolumes: [Float] = []
     private var wasPlayingWhenBackgrounded = false, usageTimer: Timer?
     @Published var continuousPlayTime: TimeInterval = 0
@@ -174,7 +174,7 @@ class AudioEngineManager: ObservableObject {
     @Published var isParticleEffectsEnabled: Bool { didSet { UserDefaults.standard.set(isParticleEffectsEnabled, forKey: "isParticleEffectsEnabled") } }
     @Published var isPlaying: Bool = false {
         didSet {
-            var info = [String: Any](); info[MPMediaItemPropertyTitle] = "White Noise"; info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+            var info = [String: Any](); info[MPMediaItemPropertyTitle] = "In Rain"; info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
             if isPlaying { startUsageTracking(); updateRandomizerState() } else { stopUsageTracking(); volumeTask?.cancel(); oscillationTask?.cancel() }
         }
