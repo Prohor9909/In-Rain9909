@@ -1,49 +1,12 @@
 import SwiftUI
-import Combine
-import AVFoundation
-import MediaPlayer
 import AVKit
-import UIKit
-import StoreKit
-
-struct SaveProfileOverlay: View {
-    @Binding var isPresented: Bool
-    @State private var name: String = ""
-    var onSave: (String) -> Void
-    @FocusState private var isFocused: Bool
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { isPresented = false }
-            VStack(spacing: 20) {
-                Text("Name Your Mix").font(.headline).foregroundColor(.white)
-                TextField("Mix Name", text: $name)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .padding().background(Color.white.opacity(0.1)).cornerRadius(12)
-                    .foregroundColor(.white).accentColor(.orange)
-                    .focused($isFocused).submitLabel(.done)
-                    .onSubmit { if !name.isEmpty { onSave(name); isPresented = false; name = "" } }
-                HStack(spacing: 15) {
-                    Button("Cancel") { isPresented = false; name = "" }
-                        .foregroundColor(.white.opacity(0.6)).padding(.vertical, 10).padding(.horizontal, 20)
-                    Button("Save") { if !name.isEmpty { onSave(name); isPresented = false; name = "" } }
-                        .fontWeight(.bold).foregroundColor(.black).padding(.vertical, 10).padding(.horizontal, 30)
-                        .background(Color.orange).cornerRadius(20)
-                }
-            }
-            .padding(25)
-            .background(.ultraThinMaterial).cornerRadius(25)
-            .overlay(RoundedRectangle(cornerRadius: 25).stroke(Color.white.opacity(0.1), lineWidth: 1))
-            .padding(.horizontal, 40)
-        }
-        .onAppear { isFocused = true }
-    }
-}
 
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
-        picker.backgroundColor = .clear; picker.activeTintColor = .orange; picker.tintColor = .white.withAlphaComponent(0.7)
+        picker.backgroundColor = .clear;
+        picker.activeTintColor = .systemMint;
+        picker.tintColor = .white.withAlphaComponent(0.7)
         return picker
     }
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
@@ -65,7 +28,6 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showProfiles = false
     
-    @State private var showSaveProfileOverlay = false
     @State private var showOverwriteAlert = false
     @State private var tempProfileName = ""
     
@@ -73,7 +35,7 @@ struct ContentView: View {
     @State private var showRenameAlert = false
     @State private var renameText = ""
     
-    @State private var bulbValues: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
+    @State private var bulbValues: [Double] = [0.45, 0.45, 0.45, 0.45, 0.45]
     @State private var isRandomizing = false
     @State private var shuffleRotation = 0.0
     
@@ -114,11 +76,11 @@ struct ContentView: View {
     
     let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "bolt.fill", "waveform"]
     let sliderColors: [[Color]] = [
-        [Color.black.opacity(0.6), Color.blue],
-        [Color.black.opacity(0.6), Color.red],
-        [Color.black.opacity(0.6), Color.green],
-        [Color.black.opacity(0.6), Color.yellow],
-        [Color.black.opacity(0.6), Color.brown]
+        [.black.opacity(0.6), .blue],
+        [.black.opacity(0.6), .red],
+        [.black.opacity(0.6), .green],
+        [.black.opacity(0.6), .yellow],
+        [.black.opacity(0.6), .brown]
     ]
     
     var isAnyBulbOn: Bool { bulbValues.contains(where: { $0 > 0 }) }
@@ -167,9 +129,7 @@ struct ContentView: View {
                 Button(
                     action: {
                         withAnimation(.bouncy)
-                        {
-                            showProfiles.toggle()
-                        }
+                        { showProfiles.toggle() }
                     }) {
                     Text(currentProfileButtonText).font(.caption).bold().foregroundColor(.white).textCase(.uppercase).tracking(2).padding(.top, 20)
                 }
@@ -262,14 +222,28 @@ struct ContentView: View {
                         Image(systemName: "scribble").padding(15).rotationEffect(.degrees(shuffleRotation)).foregroundStyle(.white).glassEffect(.clear).scaleEffect(isRandomizing ? 1.5 : 1.0)
                     }
                     Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); withAnimation{ showSaveProfileOverlay = true }
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); withAnimation{
+                             }
                     }) {
                         Image(systemName: "plus").font(.title2).padding(15).foregroundStyle(.white).glassEffect(.clear).opacity(isCurrentMixSaved ? 0.5 : 1.0)
                     }.disabled(isCurrentMixSaved)
                     Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); if timerManager.isTimerActive { showTimerDetail = true } else { showCustomTimerSheet = true }
+                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); if timerManager.isTimerActive {
+                            withAnimation {
+                                showTimerDetail = true
+                            }
+                        } else {
+                            withAnimation {
+                                showCustomTimerSheet = true
+                            }
+                        }
                     }) {
-                        Image(systemName: "timer").font(.title).padding(20).foregroundStyle(.white).glassEffect(.clear)
+                        Image(systemName: "timer")
+                            .font(.title)
+                            .padding(20)
+                            .foregroundStyle(timerManager.isTimerActive ? .orange : .white)
+//                            .foregroundStyle(.white)
+                            .glassEffect(.clear)
                     }
                     .contentShape(Circle()).zIndex(1)
                     .contextMenu {
@@ -286,16 +260,6 @@ struct ContentView: View {
                 .offset(y: UIDevice.current.userInterfaceIdiom == .pad ? -200 : 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            if showSaveProfileOverlay {
-                SaveProfileOverlay(isPresented: $showSaveProfileOverlay) { name in
-                    if profileManager.profiles.contains(where: { $0.name == name }) {
-                        tempProfileName = name; showOverwriteAlert = true
-                    } else {
-                        profileManager.saveProfile(name: name, values: bulbValues)
-                    }
-                }
-            }
         }
         .onAppear {
             timerManager.setAudioManager(audioManager)
@@ -316,6 +280,24 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
         .statusBarHidden(true)
+        .alert("Rename Profile", isPresented: $showRenameAlert) {
+            TextField("New Name", text: $renameText)
+            Button("Rename") {
+                if let profile = profileToRename, !renameText.isEmpty, !profileManager.profiles.contains(where: { $0.name == renameText }) {
+                    profileManager.updateProfile(id: profile.id, newName: renameText)
+                }
+            }
+            .disabled(renameText.isEmpty || profileManager.profiles.contains(where: { $0.name == renameText }))
+            Button("Cancel", role: .cancel) { }
+        }
+        .alert("Profile Already Exists", isPresented: $showOverwriteAlert) {
+            Button("Overwrite", role: .destructive) {
+                profileManager.updateProfileByName(name: tempProfileName, values: bulbValues)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("A profile with the name '\(tempProfileName)' already exists. Do you want to overwrite it?")
+        }
     }
     
     private func animateProfileOverwrite(at index: Int) {
