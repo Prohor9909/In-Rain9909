@@ -98,6 +98,7 @@ struct ContentView: View {
                             .onTapGesture {
                                 withAnimation {
                                     showProfiles = false
+                                    showTimerDetail = false
                                 }
                             }
 
@@ -135,27 +136,53 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 
                 if timerManager.isTimerActive {
-                    Button(action: { showTimerDetail = true }) {
+                    GlassEffectContainer (spacing : 0){
                         HStack {
-                            ZStack {
-                                Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
-                                Circle().trim(from: 0, to: CGFloat(timerManager.progress))
-                                    .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                    .rotationEffect(.degrees(-90))
+                            Button(action: {
+                                withAnimation(.bouncy){
+                                    showTimerDetail.toggle()
+                                }
+                            }) {
+                                HStack {
+                                    ZStack {
+                                        Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
+                                        Circle().trim(from: 0, to: CGFloat(timerManager.progress))
+                                            .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                            .rotationEffect(.degrees(-90))
+                                            .frame(width: 20, height: 20)
+                                    }
                                     .frame(width: 20, height: 20)
+                                    Text(timerManager.formattedTime)
+                                        .font(.title2)
+                                        .monospacedDigit()
+                                        .foregroundColor(.white)
+                                }
+                                .padding(10)
+                                .padding(.horizontal, 10)
+                                .glassEffect(.clear)
                             }
-                            .frame(width: 20, height: 20)
-                            Text(timerManager.formattedTime)
-                                .font(.title2)
-                                .monospacedDigit()
-                                .foregroundColor(.white)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .animation(.spring(), value: timerManager.isTimerActive)
+                            
+                            if showTimerDetail {
+                                Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    timerManager.stopTimer()
+                                }) {
+                                    Image(systemName: "xmark")
+                                        .font(.title3)
+                                        .foregroundStyle(.red)
+                                        .frame(width: 50, height: 50)
+                                        .glassEffect(.clear)
+                                }
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .scale),
+                                    removal: .move(edge: .leading).combined(with: .scale)
+                                ))
+                            }
                         }
-                        .padding(10)
-                        .padding(.horizontal, 10)
-                        .glassEffect(.clear)
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(), value: timerManager.isTimerActive)
                 }
                 
                 Spacer()
@@ -292,12 +319,11 @@ struct ContentView: View {
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light)
                         impact.impactOccurred()
-                        if timerManager.isTimerActive {
-                            withAnimation {
-                                showTimerDetail = true
+                        withAnimation (.bouncy) {
+                            if timerManager.isTimerActive {
+                                showTimerDetail.toggle()
                             }
-                        } else {
-                            withAnimation {
+                            else {
                                 showCustomTimerSheet = true
                             }
                         }
@@ -344,8 +370,10 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showCustomTimerSheet) { TimerView(timerManager: timerManager, audioManager: audioManager) }
-        .sheet(isPresented: $showTimerDetail) { CountDownView(timerManager: timerManager) }
+        .sheet(isPresented: $showCustomTimerSheet) {
+            TimerView(timerManager: timerManager, audioManager: audioManager)
+                .presentationDetents([.medium, .fraction(0.4)])
+        }        
         .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
         .statusBarHidden(true)
