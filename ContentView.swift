@@ -96,8 +96,8 @@ struct ContentView: View {
                             .ignoresSafeArea()
                             .blur(radius: 10)
                             .onTapGesture {
-                                withAnimation {
-                                    showProfiles.toggle()
+                                withAnimation  (.bouncy) {
+                                    showTimerDetail ? nil : showProfiles.toggle()
                                     showTimerDetail = false
                                 }
                             }
