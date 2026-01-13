@@ -47,6 +47,7 @@ struct SettingsView: View {
                 Alert(title: Text("Restore Complete"), message: Text(PurchaseManager.shared.isPremium ? "Your purchases have been restored." : "No previous purchases were found."), dismissButton: .default(Text("OK")))
             }
         }
+        .statusBarHidden(true)
         .scrollContentBackground(.hidden)
         .preferredColorScheme(.dark)
     }
