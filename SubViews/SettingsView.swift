@@ -29,7 +29,7 @@ struct SettingsView: View {
                 }
                 .symbolRenderingMode(.hierarchical)
                 
-                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural unpredictablity in rain.")) {
+                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural variation and an element of unpredictablity.")) {
                     Toggle("Visuals", systemImage: "bird",  isOn: $audioManager.isParticleEffectsEnabled).tint(.blue)
                     Toggle("Ambience", systemImage: "wind", isOn: $audioManager.isAmbienceEnabled).tint(.blue)
                 }

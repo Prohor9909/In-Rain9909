@@ -74,7 +74,7 @@ struct ContentView: View {
         profileManager.profiles.contains(where: { $0.bulbValues == bulbValues })
     }
     
-    let sliderIcons = ["cloud.bolt.rain", "flame", "drop.halffull", "bolt", "waveform"]
+    let sliderIcons = ["cloud.bolt.rain", "flame.fill", "drop.halffull", "bolt.fill", "waveform"]
     let sliderColors: [[Color]] = [
         [.black.opacity(0.6), .blue],
         [.black.opacity(0.6), .red],
