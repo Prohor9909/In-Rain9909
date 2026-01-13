@@ -377,7 +377,10 @@ struct ContentView: View {
             SettingsView(audioManager: audioManager)
                 .presentationBackground(.black.opacity(0.8))
         }
-        .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
+        .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
+            PurchaseView(audioManager: audioManager)
+                .presentationBackground(.ultraThinMaterial)
+        }
         .statusBarHidden(true)
         .alert("Rename Profile", isPresented: $showRenameAlert) {
             TextField("New Name", text: $renameText)

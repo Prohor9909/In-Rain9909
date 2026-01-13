@@ -18,6 +18,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .symbolRenderingMode(.hierarchical)
                 
                 Section(header: Text("Audio Behavior"), footer: Text(audioManager.isBackgroundAudioEnabled ? "Mixer mode allows audio to play simultaneously with other apps." : "Audio will stop when the app is in the background.")) {
                     Toggle("Background Audio", systemImage: "music.note", isOn: $audioManager.isBackgroundAudioEnabled.animation()).tint(.blue)
@@ -26,17 +27,22 @@ struct SettingsView: View {
                         Toggle("Mixer Mode", systemImage: "music.quarternote.3", isOn: $audioManager.isMixerModeEnabled).tint(.blue)
                     }
                 }
+                .symbolRenderingMode(.hierarchical)
                 
                 Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural unpredictablity in rain behavior.")) {
                     Toggle("Visuals", systemImage: "bird",  isOn: $audioManager.isParticleEffectsEnabled).tint(.blue)
                     Toggle("Ambience", systemImage: "wind", isOn: $audioManager.isAmbienceEnabled).tint(.blue)
                 }
+                .symbolRenderingMode(.hierarchical)
             }
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.foregroundColor(.blue)}
             }
-            .fullScreenCover(isPresented: $showUpsell) { PurchaseView(audioManager: audioManager) }
+            .fullScreenCover(isPresented: $showUpsell) {
+                PurchaseView(audioManager: audioManager)
+                    .presentationBackground(.ultraThinMaterial)
+            }
             
             .alert(isPresented: $showRestoreAlert) {
                 Alert(title: Text("Restore Complete"), message: Text(PurchaseManager.shared.isPremium ? "Your purchases have been restored." : "No previous purchases were found."), dismissButton: .default(Text("OK")))
