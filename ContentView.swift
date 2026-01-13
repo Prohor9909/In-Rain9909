@@ -306,13 +306,12 @@ struct ContentView: View {
                     }
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); withAnimation{
-                            audioManager.isRandomVolumeEnabled.toggle()
-                            audioManager.isRandomOscillationEnabled.toggle()
+                            audioManager.isAmbienceEnabled.toggle()
                         }
                     }) {
                         Image(systemName: "wind")
                             .font(.title2)
-                            .foregroundStyle((audioManager.isRandomVolumeEnabled && audioManager.isRandomOscillationEnabled) ? .orange : .white)
+                            .foregroundStyle(audioManager.isAmbienceEnabled ? .orange : .white)
                             .frame(width: 45, height: 45)
                             .glassEffect(.clear)
                     }
@@ -373,8 +372,11 @@ struct ContentView: View {
         .sheet(isPresented: $showCustomTimerSheet) {
             TimerView(timerManager: timerManager, audioManager: audioManager)
                 .presentationDetents([.medium, .fraction(0.4)])
-        }        
-        .fullScreenCover(isPresented: $showSettings) { SettingsView(audioManager: audioManager) }
+        }
+        .fullScreenCover(isPresented: $showSettings){
+            SettingsView(audioManager: audioManager)
+                .presentationBackground(.black.opacity(0.8))
+        }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) { PurchaseView(audioManager: audioManager) }
         .statusBarHidden(true)
         .alert("Rename Profile", isPresented: $showRenameAlert) {

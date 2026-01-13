@@ -165,17 +165,16 @@ class AudioEngineManager: ObservableObject {
     @Published var continuousPlayTime: TimeInterval = 0
     @Published var showPremiumUpsell = false
     @Published var triggerFlash = false
-    private var volumeTask: Task<Void, Never>?, oscillationTask: Task<Void, Never>?
+    private var ambienceVolumeTask: Task<Void, Never>?, ambienceOscillationTask: Task<Void, Never>?
     @Published var isBackgroundAudioEnabled: Bool { didSet { UserDefaults.standard.set(isBackgroundAudioEnabled, forKey: "isBackgroundAudioEnabled"); configureAudioSession() } }
     @Published var isMixerModeEnabled: Bool { didSet { UserDefaults.standard.set(isMixerModeEnabled, forKey: "isMixerModeEnabled"); configureAudioSession() } }
-    @Published var isRandomVolumeEnabled: Bool { didSet { UserDefaults.standard.set(isRandomVolumeEnabled, forKey: "isRandomVolumeEnabled"); updateRandomizerState() } }
-    @Published var isRandomOscillationEnabled: Bool { didSet { UserDefaults.standard.set(isRandomOscillationEnabled, forKey: "isRandomOscillationEnabled"); updateRandomizerState() } }
+    @Published var isAmbienceEnabled: Bool { didSet { UserDefaults.standard.set(isAmbienceEnabled, forKey: "isAmbienceEnabled"); updateAmbienceState() } }
     @Published var isParticleEffectsEnabled: Bool { didSet { UserDefaults.standard.set(isParticleEffectsEnabled, forKey: "isParticleEffectsEnabled") } }
     @Published var isPlaying: Bool = false {
         didSet {
             var info = [String: Any](); info[MPMediaItemPropertyTitle] = "In Rain"; info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-            if isPlaying { startUsageTracking(); updateRandomizerState() } else { stopUsageTracking(); volumeTask?.cancel(); oscillationTask?.cancel() }
+            if isPlaying { startUsageTracking(); updateAmbienceState() } else { stopUsageTracking(); ambienceVolumeTask?.cancel(); ambienceOscillationTask?.cancel() }
         }
     }
     @Published var masterVolume: Float = 1.0 { didSet { updateAllVolumes() } }
@@ -183,13 +182,12 @@ class AudioEngineManager: ObservableObject {
     init() {
         self.isBackgroundAudioEnabled = UserDefaults.standard.object(forKey: "isBackgroundAudioEnabled") as? Bool ?? true
         self.isMixerModeEnabled = UserDefaults.standard.object(forKey: "isMixerModeEnabled") as? Bool ?? false
-        self.isRandomVolumeEnabled = UserDefaults.standard.object(forKey: "isRandomVolumeEnabled") as? Bool ?? true
-        self.isRandomOscillationEnabled = UserDefaults.standard.object(forKey: "isRandomOscillationEnabled") as? Bool ?? true
+        self.isAmbienceEnabled = UserDefaults.standard.object(forKey: "isAmbienceEnabled") as? Bool ?? true
         self.isParticleEffectsEnabled = UserDefaults.standard.object(forKey: "isParticleEffectsEnabled") as? Bool ?? true
         individualVolumes = Array(repeating: 0.5, count: fileNames.count)
         configureAudioSession(); setupTracks(); setupInterruptionObserver(); setupRemoteTransportControls(); setupLifecycleObservers()
     }
-    deinit { NotificationCenter.default.removeObserver(self); volumeTask?.cancel(); oscillationTask?.cancel(); usageTimer?.invalidate() }
+    deinit { NotificationCenter.default.removeObserver(self); ambienceVolumeTask?.cancel(); ambienceOscillationTask?.cancel(); usageTimer?.invalidate() }
     private func setupLifecycleObservers() {
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
@@ -224,14 +222,23 @@ class AudioEngineManager: ObservableObject {
             tracks.append(track)
         }
     }
-    private func updateRandomizerState() {
-        volumeTask?.cancel(); oscillationTask?.cancel()
+    private func updateAmbienceState() {
+        ambienceVolumeTask?.cancel(); ambienceOscillationTask?.cancel()
         guard isPlaying else { return }
-        if isRandomVolumeEnabled { startRandomVolumeLoop() } else { for track in tracks { track.fadeRandomVolume(to: 1.0, duration: 1.0) } }
-        if isRandomOscillationEnabled { startRandomOscillationLoop() } else { for track in tracks { track.fadePan(to: 0.0, duration: 1.0) } }
+        
+        if isAmbienceEnabled {
+            startAmbienceSimulation()
+        } else {
+            for track in tracks {
+                track.fadeRandomVolume(to: 1.0, duration: 1.0)
+                track.fadePan(to: 0.0, duration: 1.0)
+            }
+        }
     }
-    private func startRandomVolumeLoop() {
-        volumeTask = Task {
+    
+    private func startAmbienceSimulation() {
+        // Start volume randomization
+        ambienceVolumeTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 3...45) * 1_000_000_000))
                 if Task.isCancelled { break }
@@ -239,9 +246,9 @@ class AudioEngineManager: ObservableObject {
                 await MainActor.run { for track in tracks { if track.fileName == "Fireplace" { continue }; track.fadeRandomVolume(to: tgt, duration: dur) } }
             }
         }
-    }
-    private func startRandomOscillationLoop() {
-        oscillationTask = Task {
+        
+        // Start spatial randomization
+        ambienceOscillationTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 3...45) * 1_000_000_000))
                 if Task.isCancelled { break }
@@ -264,6 +271,7 @@ class AudioEngineManager: ObservableObject {
             }
         }
     }
+
     private func startUsageTracking() {
         stopUsageTracking()
         guard !PurchaseManager.shared.isPremium else { return }

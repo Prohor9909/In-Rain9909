@@ -9,52 +9,40 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Membership Status").foregroundColor(.gray)) {
+                Section(header: Text("Membership Status"), footer: Text(PurchaseManager.shared.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
                     if PurchaseManager.shared.isPremium {
-                        Menu {
-                            Button(action: { Task { try? await PurchaseManager.shared.restorePurchases(); showRestoreAlert = true } }) {
-                                Label("Restore Purchases", systemImage: "arrow.clockwise")
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "checkmark.seal.fill").foregroundColor(.orange)
-                                Text("Full Version").foregroundColor(.orange)
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption).foregroundColor(.gray)
-                            }
-                        }
+                        Label("Full Version", systemImage: "balloon.2")
                     } else {
                         Button(action: { showUpsell = true }) {
-                            HStack { Image(systemName: "crown.fill").foregroundColor(.orange); Text("Trial Version").foregroundColor(.white) }
+                            Label("Trial Mode", systemImage: "hourglass")
                         }
                     }
-                }.listRowBackground(Color.white.opacity(0.1))
-                Section(header: Text("Background Audio").foregroundColor(.gray), footer: Text(audioManager.isBackgroundAudioEnabled ? "Mixer Mode allows audio to play simultaneously with other apps." : "Audio will stop when the app is in the background.").foregroundColor(.gray)) {
-                    Toggle("Background Audio", isOn: $audioManager.isBackgroundAudioEnabled.animation()).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                }
+                
+                Section(header: Text("Audio Behavior"), footer: Text(audioManager.isBackgroundAudioEnabled ? "Mixer mode allows audio to play simultaneously with other apps." : "Audio will stop when the app is in the background.")) {
+                    Toggle("Background Audio", systemImage: "music.note", isOn: $audioManager.isBackgroundAudioEnabled.animation()).tint(.blue)
+                    
                     if audioManager.isBackgroundAudioEnabled {
-                        Toggle("Mixer Mode", isOn: $audioManager.isMixerModeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
+                        Toggle("Mixer Mode", systemImage: "music.quarternote.3", isOn: $audioManager.isMixerModeEnabled).tint(.blue)
                     }
-                }.listRowBackground(Color.white.opacity(0.1))
-                Section(header: Text("Ambience").foregroundColor(.gray), footer: Text("Create subtle natural variations to your mix.").foregroundColor(.gray)) {
-                    Toggle("Dynamic Intensity", isOn: $audioManager.isRandomVolumeEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                    Toggle("Spatial Polarization", isOn: $audioManager.isRandomOscillationEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                }.listRowBackground(Color.white.opacity(0.1))
-                Section(header: Text("Beta Features").foregroundColor(.gray), footer: Text("These features are currently in beta.").foregroundColor(.gray)) {
-                    Toggle("Visuals", isOn: $audioManager.isParticleEffectsEnabled).toggleStyle(SwitchToggleStyle(tint: .green)).foregroundColor(.white)
-                }.listRowBackground(Color.white.opacity(0.1))
+                }
+                
+                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural unpredictablity in rain behavior.")) {
+                    Toggle("Visuals", systemImage: "bird",  isOn: $audioManager.isParticleEffectsEnabled).tint(.blue)
+                    Toggle("Ambience", systemImage: "wind", isOn: $audioManager.isAmbienceEnabled).tint(.blue)
+                }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color(red: 0.08, green: 0.08, blue: 0.12).ignoresSafeArea())
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.font(.headline).foregroundColor(.blue) }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.foregroundColor(.blue)}
             }
             .fullScreenCover(isPresented: $showUpsell) { PurchaseView(audioManager: audioManager) }
+            
             .alert(isPresented: $showRestoreAlert) {
                 Alert(title: Text("Restore Complete"), message: Text(PurchaseManager.shared.isPremium ? "Your purchases have been restored." : "No previous purchases were found."), dismissButton: .default(Text("OK")))
             }
         }
+        .scrollContentBackground(.hidden)
         .preferredColorScheme(.dark)
     }
 }
