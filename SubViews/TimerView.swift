@@ -25,7 +25,7 @@ struct TimerView: View {
                     .clipped()
             }
             .colorScheme(.dark)
-            
+            .navigationTitle("Timer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -34,7 +34,7 @@ struct TimerView: View {
                         if totalSeconds > 0 { timerManager.startTimer(duration: totalSeconds) }
                         dismiss()
                     }) {
-                        Text("Set")
+                        Text("Done")
                             .foregroundColor(.blue)
                     }
                 }

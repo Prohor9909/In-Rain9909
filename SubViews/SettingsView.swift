@@ -29,7 +29,7 @@ struct SettingsView: View {
                 }
                 .symbolRenderingMode(.hierarchical)
                 
-                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural unpredictablity in rain behavior.")) {
+                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural unpredictablity in rain.")) {
                     Toggle("Visuals", systemImage: "bird",  isOn: $audioManager.isParticleEffectsEnabled).tint(.blue)
                     Toggle("Ambience", systemImage: "wind", isOn: $audioManager.isAmbienceEnabled).tint(.blue)
                 }
@@ -41,7 +41,6 @@ struct SettingsView: View {
             }
             .fullScreenCover(isPresented: $showUpsell) {
                 PurchaseView(audioManager: audioManager)
-                    .presentationBackground(.ultraThinMaterial)
             }
             
             .alert(isPresented: $showRestoreAlert) {

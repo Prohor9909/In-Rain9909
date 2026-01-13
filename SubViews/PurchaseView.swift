@@ -7,49 +7,86 @@ struct PurchaseView: View {
     @ObservedObject private var purchaseManager = PurchaseManager.shared
     
     var body: some View {
-        VStack (spacing: 10) {
+        ZStack{
+            Color.clear
+                .background {
+                    Image("background")
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+                        .blur(radius: 20)
+                }
+
+            RainEffectView(
+                intensity: 0.1,
+                windAngle: -15,
+                isEnabled: audioManager.isParticleEffectsEnabled,
+                isPlaying: audioManager.isPlaying
+            )
+            .edgesIgnoringSafeArea(.all)
+            .allowsHitTesting(false)
+            .padding(-200)
             
-            Spacer()
-                        
-            Text("Upgrade to Premium")
-                .font(.largeTitle)
-            
-            Text("Enjoy uninterrupted relaxation")
-                .font(.title3)
-            
-            Spacer()
-            
-            Image("InRain")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 150, height: 150)
-                .cornerRadius(20)
-                .padding(5)
-                .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20))
-            
-            Spacer()
-            
-            Button(action: { purchaseManager.purchasePremium() }) {
-                Text("Purchase Full Version \(purchaseManager.products.first?.displayPrice ?? "$2.99")")
-                    .frame(width: 300, height: 40)
+            VStack (spacing: 0) {
+                                
+                Text("Unlock Premium")
+                    .font(.title).bold()
+                    .padding(.top, 30)
+                
+                Text("For Uninterrupted Playback")
+                
+                Spacer()
+                
+                Image("InRain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 150, height: 150)
+                    .cornerRadius(30)
+                    .padding(5)
+                    .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 30))
+                    .shadow(color: .white.opacity(0.3), radius: 30)
+                    .shadow(color: .white.opacity(0.3), radius: 30)
+                
+                Spacer()
+                
+                Button(action: { purchaseManager.purchasePremium() }) {
+                    Text("\(Image(systemName: "balloon.2"))   Full Version \(purchaseManager.products.first?.displayPrice ?? "$0.99")")
+                        .bold()
+                        .frame(width: 200, height: 40)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.glass)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .padding(.bottom, 10)
+                
+                Button(action: { Task { try? await purchaseManager.restorePurchases() } }) {
+                    Text("\(Image(systemName: "icloud.and.arrow.down"))   Restore Purchase")
+                        .bold()
+                        .frame(width: 200, height: 40)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.glass)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .padding(.bottom, 10)
+                
+                Spacer()
+                
+                Button(action: { dismiss() }) {
+                    Text("\(Image(systemName: "hourglass"))   Continue Trial")
+                        .bold()
+                        .foregroundStyle(.black)
+                        .frame(width: 160, height: 40)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.glassProminent)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .shadow(color: .white.opacity(0.3), radius: 30)
+                .padding(.bottom, 10)
             }
-            .buttonStyle(.glass)
-            
-            Button(action: { dismiss(); audioManager.play() }) {
-                Text("Continue Trial Mode")
-                    .frame(width: 300, height: 40)
-            }
-            .buttonStyle(.glass)
-            
-            Button(action: { Task { try? await purchaseManager.restorePurchases() } }) {
-                Text("Restore Purchase")
-                    .frame(width: 300, height: 40)
-            }
-            .buttonStyle(.glass)
         }
         .statusBarHidden(true)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
         .presentationBackground(.clear)
         .onChange(of: purchaseManager.isPremium) { _, newValue in
             if newValue {

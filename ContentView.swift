@@ -48,9 +48,9 @@ struct ContentView: View {
     private let presetTemplates: [PresetTemplate] = [
         PresetTemplate(name: "Unwind", icon: "apple.meditate", values: [0.45, 0.45, 0.45, 0.45, 0.45]),
         PresetTemplate(name: "Study", icon: "lamp.desk.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Sleep", icon: "moon.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Isolation", icon: "person.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Focus", icon: "brain.filled.head.profile", values: [0.5, 0.5, 0.5, 0.5, 0.5])
+        PresetTemplate(name: "Sleep", icon: "moon.fill", values: [0.3, 0.6, 0.6, 0.2, 0.3]),
+        PresetTemplate(name: "Isolation", icon: "person.fill", values: [0.35, 0.85, 0.15, 0.35, 0.25]),
+        PresetTemplate(name: "Focus", icon: "brain.filled.head.profile", values: [0.5, 0.05, 0.45, 0.65, 0.25])
     ]
     
     private var currentProfileButtonText: String {
@@ -74,7 +74,7 @@ struct ContentView: View {
         profileManager.profiles.contains(where: { $0.bulbValues == bulbValues })
     }
     
-    let sliderIcons = ["cloud.rain.fill", "flame.fill", "drop.fill", "bolt.fill", "waveform"]
+    let sliderIcons = ["cloud.bolt.rain", "flame", "drop.halffull", "bolt", "waveform"]
     let sliderColors: [[Color]] = [
         [.black.opacity(0.6), .blue],
         [.black.opacity(0.6), .red],
@@ -97,7 +97,7 @@ struct ContentView: View {
                             .blur(radius: 10)
                             .onTapGesture {
                                 withAnimation {
-                                    showProfiles = false
+                                    showProfiles.toggle()
                                     showTimerDetail = false
                                 }
                             }
@@ -155,7 +155,6 @@ struct ContentView: View {
                                     Text(timerManager.formattedTime)
                                         .font(.title2)
                                         .monospacedDigit()
-                                        .foregroundColor(.white)
                                 }
                                 .padding(10)
                                 .padding(.horizontal, 10)
@@ -201,13 +200,11 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                Button(
-                    action: {
-                        withAnimation(.bouncy)
-                        { showProfiles.toggle() }
-                    }) {
-                    Text(currentProfileButtonText).font(.caption).bold().foregroundColor(.white).textCase(.uppercase).tracking(2).padding(.top, 20)
-                }
+
+                Text(currentProfileButtonText)
+                    .font(.caption).bold()
+                    .textCase(.uppercase).tracking(2)
+                    .padding(.top, 20)
                     .offset(y: showProfiles ? -20 : 0)
                 
                 HStack(spacing: 15) {
@@ -225,7 +222,7 @@ struct ContentView: View {
                                 let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred()
                             }) {
                                 Image(systemName: template.icon)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(bulbValues == profile.bulbValues ? .orange : .white)
                                     .frame(width: 45, height: 45)
                                     .rotationEffect(.degrees(reRotating[index] ? -360 : profileRotations[index]))
                                     .scaleEffect(reRotating[index] ? 0.8 : (overRotating[index] ? 1.5 : 1.0))
@@ -379,7 +376,6 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $audioManager.showPremiumUpsell) {
             PurchaseView(audioManager: audioManager)
-                .presentationBackground(.ultraThinMaterial)
         }
         .statusBarHidden(true)
         .alert("Rename Profile", isPresented: $showRenameAlert) {
