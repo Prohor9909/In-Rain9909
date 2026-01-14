@@ -37,6 +37,7 @@ struct ContentView: View {
     
     @State private var bulbValues: [Double] = [0.45, 0.45, 0.45, 0.45, 0.45]
     @State private var isRandomizing = false
+    @State private var isWindBouncing = false
     @State private var shuffleRotation = -30.0
     
     @State private var profileRotations: [Double] = [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -299,18 +300,30 @@ struct ContentView: View {
                             .foregroundStyle(.white)
                             .frame(width: 45, height: 45)
                             .glassEffect(.clear)
-                            .scaleEffect(isRandomizing ? 1.5 : 1.0)
+                            .scaleEffect(isRandomizing ? 1.2 : 1.0)
                     }
                     Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light); impact.impactOccurred(); withAnimation{
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
+                        withAnimation{
                             audioManager.isAmbienceEnabled.toggle()
+                        }
+                        withAnimation(.spring(duration: 0.3)) {
+                            isWindBouncing = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            withAnimation(.spring(duration: 0.3)) {
+                                isWindBouncing = false
+                            }
                         }
                     }) {
                         Image(systemName: "wind")
                             .font(.title2)
                             .foregroundStyle(audioManager.isAmbienceEnabled ? .orange : .white)
                             .frame(width: 45, height: 45)
+                            .rotationEffect(.degrees(isWindBouncing ? -15 : 0))
                             .glassEffect(.clear)
+                            .scaleEffect(isWindBouncing ? 1.2 : 1.0)
                     }
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .light)
@@ -422,17 +435,17 @@ struct ContentView: View {
     
     private func randomizeMix() {
         let impact = UIImpactFeedbackGenerator(style: .medium); impact.impactOccurred()
-        withAnimation {
+        withAnimation(.spring(duration: 0.3)) {
             shuffleRotation = 15
             isRandomizing = true
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.spring(duration: 0.3)) {
                 shuffleRotation = -30
                 isRandomizing = false
             }
         }
-        withAnimation {
+        withAnimation(.spring(duration: 0.3)) {
             for i in 0..<bulbValues.count {
                 bulbValues[i] = Double.random(in: 0...1)
             }
