@@ -5,15 +5,16 @@ struct SettingsView: View {
     @ObservedObject var audioManager: AudioEngineManager
     @State private var showUpsell = false
     @State private var showRestoreAlert = false
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Membership Status"), footer: Text(PurchaseManager.shared.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
+                Section(header: Text("App Status"), footer: Text(PurchaseManager.shared.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
                     if PurchaseManager.shared.isPremium {
                         Button(action: { showUpsell = true }) {
-                            Label("Full Version", systemImage: "balloon.2")
-                                .foregroundStyle(.primary) // Keeps the text color standard
+                            Label("In Rain v\(version)", systemImage: "balloon.2")
+                                .foregroundStyle(.primary)
                         }
                     } else {
                         Button(action: { showUpsell = true }) {
@@ -23,7 +24,7 @@ struct SettingsView: View {
                 }
                 .symbolRenderingMode(.hierarchical)
                 
-                Section(header: Text("Audio Behavior"), footer: Text(audioManager.isBackgroundAudioEnabled ? "Mixer mode allows audio to play simultaneously with other apps." : "Audio will stop when the app is in the background.")) {
+                Section(header: Text("Audio Behavior"), footer: Text(audioManager.isBackgroundAudioEnabled ? "Mixer allows audio to blend with other apps." : "Audio continues to play in background.")) {
                     Toggle("Background Audio", systemImage: "music.note", isOn: $audioManager.isBackgroundAudioEnabled.animation()).tint(.blue)
                     
                     if audioManager.isBackgroundAudioEnabled {
@@ -32,7 +33,7 @@ struct SettingsView: View {
                 }
                 .symbolRenderingMode(.hierarchical)
                 
-                Section(header: Text("Ambient Effects"), footer: Text("Ambience introduces a natural variation and an element of unpredictablity.")) {
+                Section(header: Text("Ambient Effects"), footer: Text("Ambience creates an ever changing variation.")) {
                     Toggle("Visuals", systemImage: "bird",  isOn: $audioManager.isParticleEffectsEnabled).tint(.blue)
                     Toggle("Ambience", systemImage: "wind", isOn: $audioManager.isAmbienceEnabled).tint(.blue)
                 }

@@ -6,18 +6,22 @@ struct PurchaseView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var purchaseManager = PurchaseManager.shared
     @State private var isPulsing = false
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
     private let features = [
-        ("infinity", "Unlimited Playback", "No time limits or interruptions"),
-        ("speaker.wave.3.fill", "Background Audio", "Play while using other apps"),
-        ("slider.horizontal.3", "Mixer Mode", "Blend with other audio sources"),
-        ("wind", "Dynamic Ambience", "Smart, changing atmosphere"),
-        ("sparkles", "Visual Effects", "Immersive rain and fire visuals")
+        ("slider.vertical.3", "Atmospheric Canvas", "Rain, Fire, Splash, Thunder, Rumble"),
+        ("sparkles", "Immersive Visuals", "Vivid real-time atmospheric effects"),
+        ("wind", "Ambient Drift", "An infinite, ever-evolving atmosphere"),
+        ("music.quarternote.3", "Mixer Mode", "Blend with music from other apps"),
+        ("apple.meditate", "Sound Profiles", "Pin your fine-tuned favorites"),
+        ("hourglass", "Limitless Playback", "Remove trial restrictions"),
+        ("timer", "Crossfade Timer", "Clock your ambient lifespan"),
+        ("moon", "Background Audio", "Play while your device sleeps"),
+        ("infinity", "Lifetime Unlock", "Not a subscription, forever yours!")
     ]
     
     var body: some View {
         ZStack {
-            // Background Image - Shifted up slightly as requested
             Color.clear
                 .background {
                     Image("background")
@@ -25,10 +29,8 @@ struct PurchaseView: View {
                         .scaledToFill()
                         .ignoresSafeArea()
                         .blur(radius: 20)
-                        .offset(y: -100) // Moved background up
                 }
-
-            // Rain Effect
+            
             RainEffectView(
                 intensity: 0.1,
                 windAngle: -15,
@@ -39,40 +41,41 @@ struct PurchaseView: View {
             .allowsHitTesting(false)
             .padding(-200)
             
-            VStack(spacing: 0) {
-                // Header & Logo
-                VStack(spacing: 15) {
-                    Text(purchaseManager.isPremium ? "Premium Unlocked" : "Unlock Premium")
+            VStack(spacing: 10) {
+                
+                VStack(spacing: 0) {
+                    Text(purchaseManager.isPremium ? "In Rain" : "In Rain v\(version)")
                         .font(.title).bold()
                         .shadow(radius: 5)
                     
-                    Text(purchaseManager.isPremium ? "You have the full version" : "For Uninterrupted Playback")
+                    Text(purchaseManager.isPremium ? "Create your own Soundscape" : "Exclusive 75% Launch Discount")
                         .font(.subheadline)
                         .opacity(0.8)
                         .shadow(radius: 5)
-
-                    Image("InRain")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 100, height: 100)
-                        .scaleEffect(isPulsing ? 1.05 : 1)
-                        .cornerRadius(25)
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 25))
-                        .shadow(color: .white.opacity(isPulsing ? 0.3 : 0.0), radius: isPulsing ? 20 : 0)
-                        .animation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true), value: isPulsing)
-                        .onAppear { isPulsing = true }
                 }
-                .padding(.top, 40)
                 
                 Spacer()
                 
-                // Features List
-                VStack(alignment: .leading, spacing: 20) {
+                Image("InRain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 180, height: 180)
+                    .scaleEffect(isPulsing ? 1.25 : 1)
+                    .cornerRadius(25)
+                    .padding(3)
+                    .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 25))
+                    .shadow(color: .white.opacity(isPulsing ? 0.3 : 0.0), radius: isPulsing ? 20 : 0)
+                    .animation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true), value: isPulsing)
+                    .onAppear { isPulsing = true }
+                
+                Spacer()
+
+                ScrollView {
                     ForEach(features, id: \.1) { icon, title, subtitle in
                         HStack(spacing: 15) {
                             Image(systemName: icon)
                                 .font(.title3)
-                                .frame(width: 30, height: 30)
+                                .frame(width: 40, height: 40)
                                 .foregroundStyle(.white)
                                 .glassEffect(.clear)
                                 .clipShape(Circle())
@@ -85,59 +88,50 @@ struct PurchaseView: View {
                                     .font(.caption)
                                     .opacity(0.7)
                             }
+                            Spacer()
                         }
+                        .padding(.horizontal, 20)
                     }
                 }
-                .padding(.horizontal, 30)
-                .padding(.vertical, 20)
-                .background(.ultraThinMaterial.opacity(0.3), in: RoundedRectangle(cornerRadius: 20))
-                .padding(.horizontal, 20)
+                .scrollIndicators(.hidden)
                 
                 Spacer()
-                
-                // Buttons at the very bottom
-                VStack(spacing: 12) {
-                    if purchaseManager.isPremium {
-                        Button(action: { dismiss() }) {
-                            Text("\(Image(systemName: "checkmark.circle.fill"))   Return to App")
-                                .bold()
-                                .frame(width: 300, height: 45)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                        .buttonStyle(.glass)
-                        .shadow(color: .white.opacity(0.2), radius: 10)
-                    } else {
-                        Button(action: { purchaseManager.purchasePremium() }) {
-                            Text("\(Image(systemName: "balloon.2"))   Full Version \(purchaseManager.products.first?.displayPrice ?? "$0.99")")
-                                .bold()
-                                .frame(width: 300, height: 45)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                        .buttonStyle(.glass)
-                        .shadow(color: .white.opacity(0.2), radius: 10)
-                        
-                        Button(action: { Task { try? await purchaseManager.restorePurchases() } }) {
-                            Text("\(Image(systemName: "icloud.and.arrow.down"))   Restore Purchase")
-                                .bold()
-                                .frame(width: 300, height: 45)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                        .buttonStyle(.glass)
-                        .shadow(color: .white.opacity(0.2), radius: 10)
-                        
-                        Button(action: { dismiss() }) {
-                            Text("\(Image(systemName: "hourglass"))   Continue Trial")
-                                .bold()
-                                .foregroundStyle(.black)
-                                .frame(width: 250, height: 40)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .shadow(color: .white.opacity(0.2), radius: 10)
+                                
+                if !purchaseManager.isPremium {
+                    Button(action: { purchaseManager.purchasePremium() }) {
+                        Text("\(Image(systemName: "balloon.2"))   Full Version \(purchaseManager.products.first?.displayPrice ?? "$9.99")")
+                            .bold()
+                            .frame(width: 250, height: 35)
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .buttonStyle(.glass)
+                    .shadow(color: .white.opacity(0.2), radius: 10)
+                    
+                    Button(action: { Task { try? await purchaseManager.restorePurchases() } }) {
+                        Text("\(Image(systemName: "icloud.and.arrow.down"))   Restore Purchase")
+                            .bold()
+                            .frame(width: 250, height: 35)
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .buttonStyle(.glass)
+                    .shadow(color: .white.opacity(0.2), radius: 10)
+                }
+            }
+            VStack{
+                HStack {
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .padding(10)
+                            .glassEffect(.clear)
+                            .clipShape(Circle())
                     }
                 }
-                .padding(.bottom, 30)
+                Spacer()
             }
+            .padding(30)
+            .ignoresSafeArea()
         }
         .statusBarHidden(true)
         .presentationBackground(.clear)
