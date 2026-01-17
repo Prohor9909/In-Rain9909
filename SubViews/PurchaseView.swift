@@ -6,7 +6,6 @@ struct PurchaseView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var purchaseManager = PurchaseManager.shared
     @State private var isPulsing = false
-    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
     private let features = [
         ("slider.vertical.3", "Atmospheric Canvas", "Rain, Fire, Splash, Thunder, Rumble"),
@@ -44,7 +43,7 @@ struct PurchaseView: View {
             VStack(spacing: 10) {
                 
                 VStack(spacing: 0) {
-                    Text(purchaseManager.isPremium ? "In Rain" : "In Rain v\(version)")
+                    Text("In Rain")
                         .font(.title).bold()
                         .shadow(radius: 5)
                     
