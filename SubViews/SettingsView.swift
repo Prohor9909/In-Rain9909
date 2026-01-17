@@ -11,7 +11,10 @@ struct SettingsView: View {
             List {
                 Section(header: Text("Membership Status"), footer: Text(PurchaseManager.shared.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
                     if PurchaseManager.shared.isPremium {
-                        Label("Full Version", systemImage: "balloon.2")
+                        Button(action: { showUpsell = true }) {
+                            Label("Full Version", systemImage: "balloon.2")
+                                .foregroundStyle(.primary) // Keeps the text color standard
+                        }
                     } else {
                         Button(action: { showUpsell = true }) {
                             Label("Trial Mode", systemImage: "hourglass")

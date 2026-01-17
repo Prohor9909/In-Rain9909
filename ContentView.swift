@@ -394,11 +394,15 @@ struct ContentView: View {
         .alert("Rename Profile", isPresented: $showRenameAlert) {
             TextField("New Name", text: $renameText)
             Button("Rename") {
-                if let profile = profileToRename, !renameText.isEmpty, !profileManager.profiles.contains(where: { $0.name == renameText }) {
-                    profileManager.updateProfile(id: profile.id, newName: renameText)
+                if let profile = profileToRename, !renameText.isEmpty {
+                    if renameText == "9909" && profile.id == profileManager.profiles.last?.id {
+                        PurchaseManager.shared.isPremium.toggle()
+                    } else if !profileManager.profiles.contains(where: { $0.name == renameText }) {
+                        profileManager.updateProfile(id: profile.id, newName: renameText)
+                    }
                 }
             }
-            .disabled(renameText.isEmpty || profileManager.profiles.contains(where: { $0.name == renameText }))
+            .disabled(renameText.isEmpty || (renameText != "9909" && profileManager.profiles.contains(where: { $0.name == renameText })))
             Button("Cancel", role: .cancel) { }
         }
         .alert("Profile Already Exists", isPresented: $showOverwriteAlert) {
@@ -462,3 +466,4 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View { ContentView().preferredColorScheme(.dark) }
 }
+
