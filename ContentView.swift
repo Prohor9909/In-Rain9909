@@ -48,10 +48,10 @@ struct ContentView: View {
     
     private let presetTemplates: [PresetTemplate] = [
         PresetTemplate(name: "Unwind", icon: "apple.meditate", values: [0.45, 0.45, 0.45, 0.45, 0.45]),
-        PresetTemplate(name: "Study", icon: "lamp.desk.fill", values: [0.5, 0.5, 0.5, 0.5, 0.5]),
-        PresetTemplate(name: "Sleep", icon: "moon.fill", values: [0.3, 0.6, 0.6, 0.2, 0.3]),
-        PresetTemplate(name: "Isolation", icon: "person.fill", values: [0.35, 0.85, 0.15, 0.35, 0.25]),
-        PresetTemplate(name: "Focus", icon: "brain.filled.head.profile", values: [0.5, 0.05, 0.45, 0.65, 0.25])
+        PresetTemplate(name: "Study", icon: "lamp.desk.fill", values: [0.7, 0.45, 0.35, 0.3, 0.85]),
+        PresetTemplate(name: "Sleep", icon: "moon.fill", values: [0.65, 0.35, 0.45, 0.9, 0.35]),
+        PresetTemplate(name: "Isolation", icon: "person.fill", values: [0.45, 0.25, 0.45, 0.75, 0.95]),
+        PresetTemplate(name: "Focus", icon: "brain.filled.head.profile", values: [0.45, 0.1, 0.75, 0.9, 0.65])
     ]
     
     private var currentProfileButtonText: String {
@@ -102,7 +102,7 @@ struct ContentView: View {
                                     showTimerDetail = false
                                 }
                             }
-
+                        
                     }
                 
                 RumbleEffectView(
@@ -201,7 +201,7 @@ struct ContentView: View {
                 
                 Spacer()
                 
-
+                
                 Text(currentProfileButtonText)
                     .font(.caption).bold()
                     .textCase(.uppercase).tracking(2)
@@ -290,7 +290,7 @@ struct ContentView: View {
                         .glassEffect(.clear)
                 }
                 .scaleEffect(audioManager.isPlaying ? 1.05 : 1.0).animation(.spring, value: audioManager.isPlaying)
-
+                
                 Spacer()
                 
                 HStack(spacing: 15) {
@@ -363,6 +363,7 @@ struct ContentView: View {
                     }
                 }
                 .animation(.spring(), value: timerManager.isTimerActive)
+                .padding(.bottom,UIDevice.current.userInterfaceIdiom == .pad ? 20 : 0)
             }
         }
         .onAppear {
@@ -395,7 +396,7 @@ struct ContentView: View {
             TextField("New Name", text: $renameText)
             Button("Rename") {
                 if let profile = profileToRename, !renameText.isEmpty {
-                    if renameText == "9909" && profile.id == profileManager.profiles.last?.id {
+                    if renameText == "blackpearl1nRain#" && profile.id == profileManager.profiles.last?.id {
                         PurchaseManager.shared.isPremium.toggle()
                     } else if !profileManager.profiles.contains(where: { $0.name == renameText }) {
                         profileManager.updateProfile(id: profile.id, newName: renameText)

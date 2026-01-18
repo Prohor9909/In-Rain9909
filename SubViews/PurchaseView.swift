@@ -46,6 +46,8 @@ struct PurchaseView: View {
                     Text("In Rain")
                         .font(.title).bold()
                         .shadow(radius: 5)
+                        .padding(.top, UIDevice.current.userInterfaceIdiom == .pad ? 20 : 0)
+
                     
                     Text(purchaseManager.isPremium ? "Create your own Soundscape" : "Exclusive 75% Launch Discount")
                         .font(.subheadline)
@@ -92,13 +94,15 @@ struct PurchaseView: View {
                         .padding(.horizontal, 20)
                     }
                 }
+                .frame(maxWidth: 400)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .scrollIndicators(.hidden)
                 
                 Spacer()
                                 
                 if !purchaseManager.isPremium {
                     Button(action: { purchaseManager.purchasePremium() }) {
-                        Text("\(Image(systemName: "balloon.2"))   Full Version \(purchaseManager.products.first?.displayPrice ?? "$9.99")")
+                        Text("\(Image(systemName: "balloon.2"))   Full Version \(purchaseManager.products.first?.displayPrice ?? "$11.99")")
                             .bold()
                             .frame(width: 250, height: 35)
                             .symbolRenderingMode(.hierarchical)
@@ -116,6 +120,7 @@ struct PurchaseView: View {
                     .shadow(color: .white.opacity(0.2), radius: 10)
                 }
             }
+            
             VStack{
                 HStack {
                     Spacer()
