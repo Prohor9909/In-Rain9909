@@ -137,50 +137,48 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 
                 if timerManager.isTimerActive {
-                    GlassEffectContainer (spacing : 0){
-                        HStack {
+                    HStack {
+                        Button(action: {
+                            withAnimation(.bouncy){
+                                showTimerDetail.toggle()
+                            }
+                        }) {
+                            HStack {
+                                ZStack {
+                                    Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
+                                    Circle().trim(from: 0, to: CGFloat(timerManager.progress))
+                                        .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                        .rotationEffect(.degrees(-90))
+                                        .frame(width: 20, height: 20)
+                                }
+                                .frame(width: 20, height: 20)
+                                Text(timerManager.formattedTime)
+                                    .font(.title2)
+                                    .monospacedDigit()
+                            }
+                            .padding(10)
+                            .padding(.horizontal, 10)
+                            .glassEffect(.clear)
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(), value: timerManager.isTimerActive)
+                        
+                        if showTimerDetail {
                             Button(action: {
-                                withAnimation(.bouncy){
-                                    showTimerDetail.toggle()
-                                }
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                timerManager.stopTimer()
                             }) {
-                                HStack {
-                                    ZStack {
-                                        Circle().stroke(Color.white.opacity(0.3), lineWidth: 2)
-                                        Circle().trim(from: 0, to: CGFloat(timerManager.progress))
-                                            .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                            .rotationEffect(.degrees(-90))
-                                            .frame(width: 20, height: 20)
-                                    }
-                                    .frame(width: 20, height: 20)
-                                    Text(timerManager.formattedTime)
-                                        .font(.title2)
-                                        .monospacedDigit()
-                                }
-                                .padding(10)
-                                .padding(.horizontal, 10)
-                                .glassEffect(.clear)
+                                Image(systemName: "xmark")
+                                    .font(.title3)
+                                    .foregroundStyle(.red)
+                                    .frame(width: 50, height: 50)
+                                    .glassEffect(.clear)
                             }
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                            .animation(.spring(), value: timerManager.isTimerActive)
-                            
-                            if showTimerDetail {
-                                Button(action: {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                    timerManager.stopTimer()
-                                }) {
-                                    Image(systemName: "xmark")
-                                        .font(.title3)
-                                        .foregroundStyle(.red)
-                                        .frame(width: 50, height: 50)
-                                        .glassEffect(.clear)
-                                }
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .scale),
-                                    removal: .move(edge: .leading).combined(with: .scale)
-                                ))
-                            }
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .scale),
+                                removal: .move(edge: .leading).combined(with: .scale)
+                            ))
                         }
                     }
                 }
@@ -397,7 +395,7 @@ struct ContentView: View {
             Button("Rename") {
                 if let profile = profileToRename, !renameText.isEmpty {
                     if renameText == "blackpearl1nRain#" && profile.id == profileManager.profiles.last?.id {
-                        PurchaseManager.shared.isPremium.toggle()
+                        PurchaseManager.shared.toggleDevUnlock()
                     } else if !profileManager.profiles.contains(where: { $0.name == renameText }) {
                         profileManager.updateProfile(id: profile.id, newName: renameText)
                     }
@@ -467,4 +465,3 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View { ContentView().preferredColorScheme(.dark) }
 }
-
