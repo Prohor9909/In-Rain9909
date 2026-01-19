@@ -491,7 +491,8 @@ class AudioEngineManager: ObservableObject {
                 let trackDuration = track.duration
                 try? await Task.sleep(nanoseconds: UInt64(trackDuration * 1_000_000_000))
                 
-                let gap = isAmbienceEnabled ? Double.random(in: 5...45) : 5.0
+                let gap = isAmbienceEnabled ? Double.random(in: (5.0 - Double(individualVolumes[3]) * 5.0)...(30.0 - Double(individualVolumes[3]) * 25.0)) : (30.0 - Double(individualVolumes[3]) * 25.0)
+//                let gap = isAmbienceEnabled ? Double.random(in: 5...45) : 5.0
                 try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
             }
         }

@@ -33,20 +33,18 @@ struct LightningEffectView: View {
             .task(id: [triggerFlash, isEnabled && intensity > 0]) {
                 guard isEnabled && intensity > 0 else { return }
                 
-                try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
-                
                 withAnimation(.bouncy(duration: 0.4)) { flashMultiplier = 1.0 }
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 withAnimation(.easeOut(duration: 0.4)) { flashMultiplier = 0.0 }
                 
                 while !Task.isCancelled {
-                    let interval = Double.random(in: 1.0...5.0)
+                    let interval = Double.random(in: 3.0...8.0)
                     try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                     
-                    let loopIntensity = Double.random(in: 0.4...0.7)
-                    withAnimation(.bouncy(duration: 0.2)) { flashMultiplier = loopIntensity }
-                    try? await Task.sleep(nanoseconds: 200_000_000)
-                    withAnimation(.easeOut(duration: 0.2)) { flashMultiplier = 0.0 }
+                    let loopIntensity = Double.random(in: 0.4...0.8)
+                    withAnimation(.bouncy(duration: Double.random(in: 0.2...0.4))) { flashMultiplier = loopIntensity }
+                    try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2...3)) * 100_000_000)
+                    withAnimation(.easeOut(duration: Double.random(in: 0.2...0.4))) { flashMultiplier = 0.0 }
                 }
             }
             .onChange(of: isEnabled) {
