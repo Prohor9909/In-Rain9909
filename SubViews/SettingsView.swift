@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var audioManager: AudioEngineManager
+    @ObservedObject private var purchaseManager = PurchaseManager.shared
+    
     @State private var showUpsell = false
     @State private var showRestoreAlert = false
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -10,8 +12,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("App Status"), footer: Text(PurchaseManager.shared.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
-                    if PurchaseManager.shared.isPremium {
+                Section(header: Text("App Status"), footer: Text(purchaseManager.isPremium ? "You have the full version of this app." : "Trial mode interrupts playback every minute.")) {
+                    if purchaseManager.isPremium {
                         Button(action: { showUpsell = true }) {
                             Label("In Rain v\(version)", systemImage: "balloon.2")
                                 .foregroundStyle(.primary)
@@ -48,7 +50,7 @@ struct SettingsView: View {
             }
             
             .alert(isPresented: $showRestoreAlert) {
-                Alert(title: Text("Restore Complete"), message: Text(PurchaseManager.shared.isPremium ? "Your purchases have been restored." : "No previous purchases were found."), dismissButton: .default(Text("OK")))
+                Alert(title: Text("Restore Complete"), message: Text(purchaseManager.isPremium ? "Your purchases have been restored." : "No previous purchases were found."), dismissButton: .default(Text("OK")))
             }
         }
         .statusBarHidden(true)
