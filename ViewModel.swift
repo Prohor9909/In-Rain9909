@@ -122,6 +122,7 @@ class SoundTrack: NSObject {
     var onLoop: (() -> Void)?
     private var isPlaying: Bool = false
     
+    private var individualVolumeFadeTimer: Timer?
     private var volumeFadeTimer: Timer?
     private var bassFadeTimer: Timer?
     private var trebleFadeTimer: Timer?
@@ -254,8 +255,46 @@ class SoundTrack: NSObject {
     }
     
     func setVolumes(individual: Float, master: Float) {
-        self.individualVolume = individual; self.masterVolume = master
+        individualVolumeFadeTimer?.invalidate()
+        self.individualVolume = individual
+        self.masterVolume = master
         updateNodeVolumes()
+    }
+    
+    func setMasterVolume(_ master: Float) {
+        self.masterVolume = master
+        updateNodeVolumes()
+    }
+    
+    func setIndividualVolumeInstantly(_ volume: Float) {
+        individualVolumeFadeTimer?.invalidate()
+        self.individualVolume = volume
+        updateNodeVolumes()
+    }
+    
+    func fadeIndividualVolume(to target: Float, duration: TimeInterval) {
+        individualVolumeFadeTimer?.invalidate()
+        let start = individualVolume
+        let steps = max(1, Int(duration * 20))
+        guard steps > 0 else {
+            setIndividualVolumeInstantly(target)
+            return
+        }
+        let stepAmount = (target - start) / Float(steps)
+        var currentStep = 0
+        
+        individualVolumeFadeTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            currentStep += 1
+            self.individualVolume = start + (stepAmount * Float(currentStep))
+            self.updateNodeVolumes()
+            
+            if currentStep >= steps {
+                self.individualVolume = target
+                self.updateNodeVolumes()
+                timer.invalidate()
+            }
+        }
     }
     
     private func updateNodeVolumes() {
@@ -316,6 +355,11 @@ class AudioEngineManager: ObservableObject {
     private let engine = AVAudioEngine()
     private var tracks: [SoundTrack] = []
     private var thunderTracks: [SoundTrack] = []
+    
+    // Intense Rain Track and State
+    private var intenseRainTrack: SoundTrack?
+    private var isIntenseRainActive = false
+    
     private let fileNames = ["Rain", "Fire", "Splash", "Thunder", "Rumbling"]
     private let thunderFileNames = ["Thunder", "Thunder1"]
     private var individualVolumes: [Float] = []
@@ -398,6 +442,13 @@ class AudioEngineManager: ObservableObject {
     private func setupTracks() {
         tracks.removeAll()
         thunderTracks.removeAll()
+        
+        let initialRainVol = individualVolumes[0]
+        isIntenseRainActive = initialRainVol > 0.6
+        
+        intenseRainTrack = SoundTrack(fileName: "IntenseRain", engine: engine)
+        intenseRainTrack?.setVolumes(individual: isIntenseRainActive ? initialRainVol : 0.0, master: masterVolume * timerFadeVolume)
+        
         for (i, fileName) in fileNames.enumerated() {
             if fileName == "Thunder" {
                 for tName in thunderFileNames {
@@ -408,7 +459,11 @@ class AudioEngineManager: ObservableObject {
                 }
             } else {
                 let track = SoundTrack(fileName: fileName, engine: engine)
-                track.setVolumes(individual: individualVolumes[i], master: masterVolume * timerFadeVolume)
+                if fileName == "Rain" {
+                    track.setVolumes(individual: isIntenseRainActive ? 0.0 : initialRainVol, master: masterVolume * timerFadeVolume)
+                } else {
+                    track.setVolumes(individual: individualVolumes[i], master: masterVolume * timerFadeVolume)
+                }
                 tracks.append(track)
             }
         }
@@ -426,7 +481,8 @@ class AudioEngineManager: ObservableObject {
         if isAmbienceEnabled {
             startAmbienceSimulation()
         } else {
-            for track in tracks {
+            let allTracks = tracks + (intenseRainTrack != nil ? [intenseRainTrack!] : [])
+            for track in allTracks {
                 track.fadeRandomVolume(to: 1.0, duration: 2.0)
                 track.fadeBass(to: 1.0, duration: 2.0)
                 track.fadeTreble(to: 1.0, duration: 2.0)
@@ -438,7 +494,8 @@ class AudioEngineManager: ObservableObject {
     }
     
     private func startAmbienceSimulation() {
-        for track in tracks {
+        let allTracks = tracks + (intenseRainTrack != nil ? [intenseRainTrack!] : [])
+        for track in allTracks {
             if track.fileName == "Fire" { continue }
             
             let vTask = Task {
@@ -492,7 +549,6 @@ class AudioEngineManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(trackDuration * 1_000_000_000))
                 
                 let gap = isAmbienceEnabled ? Double.random(in: (5.0 - Double(individualVolumes[3]) * 5.0)...(30.0 - Double(individualVolumes[3]) * 25.0)) : (30.0 - Double(individualVolumes[3]) * 25.0)
-//                let gap = isAmbienceEnabled ? Double.random(in: 5...45) : 5.0
                 try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
             }
         }
@@ -514,11 +570,38 @@ class AudioEngineManager: ObservableObject {
         guard index < individualVolumes.count else { return }
         individualVolumes[index] = volume
         let fileName = fileNames[index]
+        
         if fileName == "Thunder" {
-            for t in thunderTracks { t.setVolumes(individual: volume, master: masterVolume * timerFadeVolume) }
+            for t in thunderTracks { t.setIndividualVolumeInstantly(volume) }
+        } else if fileName == "Rain" {
+            let wasIntense = isIntenseRainActive
+            let isNowIntense = volume > 0.6
+            
+            if isNowIntense != wasIntense {
+                isIntenseRainActive = isNowIntense
+                let fadeDuration: TimeInterval = 0.7
+                
+                if isNowIntense {
+                    // Fade out normal, fade in intense
+                    tracks.first(where: { $0.fileName == "Rain" })?.fadeIndividualVolume(to: 0, duration: fadeDuration)
+                    intenseRainTrack?.fadeIndividualVolume(to: volume, duration: fadeDuration)
+                } else {
+                    // Fade out intense, fade in normal
+                    intenseRainTrack?.fadeIndividualVolume(to: 0, duration: fadeDuration)
+                    tracks.first(where: { $0.fileName == "Rain" })?.fadeIndividualVolume(to: volume, duration: fadeDuration)
+                }
+            } else {
+                // If the threshold hasn't been crossed, just update the active track immediately.
+                // The inactive track will remain fading to 0 completely unbothered.
+                if isNowIntense {
+                    intenseRainTrack?.setIndividualVolumeInstantly(volume)
+                } else {
+                    tracks.first(where: { $0.fileName == "Rain" })?.setIndividualVolumeInstantly(volume)
+                }
+            }
         } else {
             if let track = tracks.first(where: { $0.fileName == fileName }) {
-                track.setVolumes(individual: volume, master: masterVolume * timerFadeVolume)
+                track.setIndividualVolumeInstantly(volume)
             }
         }
     }
@@ -526,13 +609,14 @@ class AudioEngineManager: ObservableObject {
     private func updateAllVolumes() {
         for (i, fileName) in fileNames.enumerated() {
             if fileName == "Thunder" {
-                for t in thunderTracks { t.setVolumes(individual: individualVolumes[i], master: masterVolume * timerFadeVolume) }
+                for t in thunderTracks { t.setMasterVolume(masterVolume * timerFadeVolume) }
             } else {
                 if let track = tracks.first(where: { $0.fileName == fileName }) {
-                    track.setVolumes(individual: individualVolumes[i], master: masterVolume * timerFadeVolume)
+                    track.setMasterVolume(masterVolume * timerFadeVolume)
                 }
             }
         }
+        intenseRainTrack?.setMasterVolume(masterVolume * timerFadeVolume)
     }
     
     func play() {
@@ -540,12 +624,14 @@ class AudioEngineManager: ObservableObject {
         engine.prepare()
         if !engine.isRunning { try? engine.start() }
         for track in tracks { track.play() }
+        intenseRainTrack?.play()
         isPlaying = true
     }
     
     func stop() {
         for track in tracks { track.pause() }
         for track in thunderTracks { track.pause() }
+        intenseRainTrack?.pause()
         engine.stop()
         isPlaying = false
     }

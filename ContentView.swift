@@ -394,7 +394,7 @@ struct ContentView: View {
             TextField("New Name", text: $renameText)
             Button("Rename") {
                 if let profile = profileToRename, !renameText.isEmpty {
-                    if renameText == "blackpearl1nRain#" && profile.id == profileManager.profiles.last?.id {
+                    if renameText == "$blackpearl1nRa1n" && profile.id == profileManager.profiles.last?.id {
                         PurchaseManager.shared.toggleDevUnlock()
                     } else if !profileManager.profiles.contains(where: { $0.name == renameText }) {
                         profileManager.updateProfile(id: profile.id, newName: renameText)
